@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import mqtt from 'mqtt'
 
 // ===== MQTT Config =====
@@ -19,12 +19,12 @@ const initialSensors = sensorConfig.map(s => ({
   connected: false,
 }))
 
-// เกณฑ์ตัดสินจากระดับน้ำ (ซม.) ตรงๆ
-// safe: < 50 ซม., warning: 50-100 ซม., danger: 100-150 ซม., critical: > 150 ซม.
-function getWaterStatus(level) {
-  if (level > 150) return 'critical'
-  if (level > 100) return 'danger'
-  if (level > 50) return 'warning'
+// เซ็นเซอร์วัดระยะจากผิวน้ำ → เลขน้อย = น้ำสูง = อันตราย
+// critical: < 10 ซม. | danger: 10–30 ซม. | warning: 30–60 ซม. | safe: > 60 ซม.
+function getWaterStatus(distance) {
+  if (distance < 10) return 'critical'
+  if (distance < 30) return 'danger'
+  if (distance < 60) return 'warning'
   return 'safe'
 }
 
@@ -33,47 +33,97 @@ function getStatusConfig(status) {
     case 'critical':
       return {
         label: 'อันตรายสูงสุด',
-        color: '#dc2626',
-        colorLight: '#fef2f2',
-        ring: 'ring-red-500/50',
+        sublabel: 'น้ำสูงมาก',
+        color: '#ef4444',
+        colorMuted: '#991b1b',
+        colorBg: 'rgba(239,68,68,0.08)',
+        colorBorder: 'rgba(239,68,68,0.2)',
         shouldEvacuate: true,
-        evacuateText: '🚨 ควรอพยพทันที!',
-        icon: '🔴',
+        evacuateText: 'ควรอพยพทันที',
+        dot: 'bg-red-500',
       }
     case 'danger':
       return {
         label: 'อันตราย',
+        sublabel: 'น้ำสูง',
         color: '#f97316',
-        colorLight: '#fff7ed',
-        ring: 'ring-orange-400/40',
+        colorMuted: '#c2410c',
+        colorBg: 'rgba(249,115,22,0.08)',
+        colorBorder: 'rgba(249,115,22,0.2)',
         shouldEvacuate: true,
-        evacuateText: '⚠️ เตรียมพร้อมอพยพ',
-        icon: '🟠',
+        evacuateText: 'เตรียมพร้อมอพยพ',
+        dot: 'bg-orange-500',
       }
     case 'warning':
       return {
         label: 'เฝ้าระวัง',
+        sublabel: 'น้ำเริ่มสูง',
         color: '#eab308',
-        colorLight: '#fefce8',
-        ring: 'ring-yellow-400/40',
+        colorMuted: '#a16207',
+        colorBg: 'rgba(234,179,8,0.08)',
+        colorBorder: 'rgba(234,179,8,0.2)',
         shouldEvacuate: false,
         evacuateText: '',
-        icon: '🟡',
+        dot: 'bg-yellow-500',
       }
     case 'safe':
     default:
       return {
         label: 'ปลอดภัย',
-        color: '#10b981',
-        colorLight: '#ecfdf5',
-        ring: 'ring-emerald-400/30',
+        sublabel: 'ระดับปกติ',
+        color: '#22c55e',
+        colorMuted: '#15803d',
+        colorBg: 'rgba(34,197,94,0.06)',
+        colorBorder: 'rgba(34,197,94,0.15)',
         shouldEvacuate: false,
         evacuateText: '',
-        icon: '🟢',
+        dot: 'bg-green-500',
       }
   }
 }
 
+// ===== Sound Engine =====
+function useAlertSound() {
+  const ctxRef = useRef(null)
+
+  const play = useCallback((type) => {
+    try {
+      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      const ctx = ctxRef.current
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      if (type === 'critical') {
+        osc.frequency.setValueAtTime(880, ctx.currentTime)
+        osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15)
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.3)
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.5)
+      } else if (type === 'danger') {
+        osc.frequency.setValueAtTime(660, ctx.currentTime)
+        osc.frequency.setValueAtTime(520, ctx.currentTime + 0.2)
+        gain.gain.setValueAtTime(0.2, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.4)
+      } else {
+        osc.frequency.setValueAtTime(440, ctx.currentTime)
+        gain.gain.setValueAtTime(0.1, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.2)
+      }
+    } catch (_) {}
+  }, [])
+
+  return play
+}
+
+// ===== Sensor Card =====
 function SensorCard({ sensor }) {
   const status = getWaterStatus(sensor.level)
   const config = getStatusConfig(status)
@@ -81,151 +131,150 @@ function SensorCard({ sensor }) {
 
   return (
     <div
-      className={`group relative bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${isAlert ? `ring-2 ${config.ring}` : ''}`}
+      className={`relative rounded-2xl border p-5 sm:p-6 transition-all duration-300 ${
+        isAlert ? 'animate-subtle-pulse' : ''
+      }`}
+      style={{
+        backgroundColor: isAlert ? config.colorBg : '#ffffff',
+        borderColor: isAlert ? config.colorBorder : 'rgba(0,0,0,0.06)',
+      }}
     >
-      {isAlert && (
-        <div className="absolute -top-2 -right-2 z-10">
-          <span className="relative flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: config.color }}></span>
-            <span className="relative inline-flex rounded-full h-4 w-4" style={{ backgroundColor: config.color }}></span>
-          </span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-base flex-shrink-0">💧</span>
-            <h3 className="font-semibold text-gray-800 text-sm truncate">{sensor.name}</h3>
-          </div>
-          <p className="text-xs text-gray-500 truncate">{sensor.location}</p>
+      {/* Top row */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-2 h-2 rounded-full ${sensor.connected ? config.dot : 'bg-gray-300'}`} />
+          <span className="text-sm font-medium text-gray-500">{sensor.location}</span>
         </div>
         <span
-          className="text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ml-2 flex-shrink-0"
-          style={{ backgroundColor: config.colorLight, color: config.color }}
+          className="text-[11px] font-semibold tracking-wide uppercase px-2.5 py-1 rounded-md whitespace-nowrap"
+          style={{ backgroundColor: config.colorBg, color: config.color, border: `1px solid ${config.colorBorder}` }}
         >
-          {config.icon} {config.label}
+          {sensor.connected ? config.label : 'รอข้อมูล'}
         </span>
       </div>
 
-      {/* ระดับน้ำ ตัวเลขใหญ่ */}
-      <div className="text-center py-4 mb-3 rounded-xl" style={{ backgroundColor: config.colorLight }}>
-        <div className="text-4xl sm:text-5xl font-extrabold tracking-tight" style={{ color: config.color }}>
+      {/* Big number */}
+      <div className="mb-6">
+        <span
+          className="text-6xl sm:text-7xl font-extrabold tracking-tighter leading-none"
+          style={{ color: sensor.connected ? config.color : '#e5e7eb' }}
+        >
           {sensor.connected ? sensor.level : '--'}
-        </div>
-        <div className="text-sm font-medium mt-1" style={{ color: config.color }}>
-          เซนติเมตร (ซม.)
-        </div>
+        </span>
+        <span className="text-sm font-medium text-gray-400 ml-2">ซม.</span>
       </div>
 
-      {/* สถานะ + อพยพ */}
-      <div className="space-y-2 mb-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">สถานะ:</span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: config.colorLight, color: config.color }}>
-            {sensor.connected ? `${config.icon} ${config.label}` : '⏳ รอข้อมูล'}
-          </span>
+      {/* Name */}
+      <h3 className="text-base font-semibold text-gray-900 mb-4">{sensor.name}</h3>
+
+      {/* Evacuate */}
+      {sensor.connected && config.shouldEvacuate && (
+        <div
+          className="rounded-lg px-3 py-2 mb-4 text-sm font-semibold whitespace-nowrap"
+          style={{ backgroundColor: config.colorBg, color: config.color }}
+        >
+          {status === 'critical' ? '🚨' : '⚠️'} {config.evacuateText}
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">อพยพ:</span>
-          {sensor.connected ? (
-            config.shouldEvacuate ? (
-              <span className="text-xs font-bold whitespace-nowrap" style={{ color: config.color }}>
-                {config.evacuateText}
-              </span>
-            ) : (
-              <span className="text-xs text-emerald-600 font-medium">✅ ไม่จำเป็น</span>
-            )
-          ) : (
-            <span className="text-xs text-gray-400">รอเชื่อมต่อ...</span>
-          )}
+      )}
+
+      {sensor.connected && !config.shouldEvacuate && (
+        <div className="rounded-lg px-3 py-2 mb-4 text-sm font-medium text-gray-400">
+          ไม่จำเป็นต้องอพยพ
         </div>
-      </div>
+      )}
+
+      {!sensor.connected && (
+        <div className="rounded-lg px-3 py-2 mb-4 text-sm font-medium text-gray-300">
+          รอเชื่อมต่อเซ็นเซอร์...
+        </div>
+      )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md font-medium">{sensor.type}</span>
-          <span className={`w-2 h-2 rounded-full ${sensor.connected ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
-          <span className="text-[10px] text-gray-400">{sensor.connected ? 'เชื่อมต่อ' : 'ไม่เชื่อมต่อ'}</span>
-        </div>
+      <div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+        <span className="text-xs text-gray-400">{sensor.type}</span>
         <span className="text-xs text-gray-400">{sensor.lastUpdated}</span>
       </div>
     </div>
   )
 }
 
-function StatCard({ label, count, color, icon, total }) {
-  const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-
+// ===== Stat Card =====
+function StatCard({ label, count, color, icon, isActive, onClick }) {
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 flex flex-col items-center w-full">
-      <div className="w-14 h-14 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: `${color}15` }}>
-        <span className="text-2xl">{icon}</span>
+    <button
+      onClick={onClick}
+      className={`rounded-xl border p-4 sm:p-5 text-left transition-all duration-200 w-full ${
+        isActive ? 'ring-2' : ''
+      }`}
+      style={{
+        backgroundColor: isActive ? color + '08' : '#ffffff',
+        borderColor: isActive ? color + '30' : 'rgba(0,0,0,0.06)',
+        boxShadow: isActive ? `0 0 0 1px ${color}20` : 'none',
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-lg">{icon}</span>
+        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{label}</span>
       </div>
       <span className="text-3xl font-bold" style={{ color }}>{count}</span>
-      <div className="mt-1 text-center">
-        <span className="text-xs sm:text-sm text-gray-600 font-medium">{label}</span>
-      </div>
-      <div className="w-full mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-1000"
-          style={{ width: `${percentage}%`, backgroundColor: color }}
-        ></div>
-      </div>
-      <span className="text-[10px] text-gray-400 mt-1">{percentage}% ของทั้งหมด</span>
-    </div>
+    </button>
   )
 }
 
-function DangerAlertBanner({ sensors }) {
-  const activeSensors = sensors.filter(s => s.connected)
-  const criticalSensors = activeSensors.filter(s => getWaterStatus(s.level) === 'critical')
-  const dangerSensors = activeSensors.filter(s => getWaterStatus(s.level) === 'danger')
-  const totalDanger = criticalSensors.length + dangerSensors.length
+// ===== Alert Banner =====
+function AlertBanner({ sensors }) {
+  const active = sensors.filter(s => s.connected)
+  const critical = active.filter(s => getWaterStatus(s.level) === 'critical')
+  const danger = active.filter(s => getWaterStatus(s.level) === 'danger')
+  const total = critical.length + danger.length
 
-  if (totalDanger === 0) return null
+  if (total === 0) return null
+
+  const isCritical = critical.length > 0
+  const color = isCritical ? '#ef4444' : '#f97316'
 
   return (
-    <div className={`rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 border-2 ${criticalSensors.length > 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex items-center gap-3 flex-1">
-          <span className="text-3xl">{criticalSensors.length > 0 ? '🚨' : '⚠️'}</span>
-          <div>
-            <h3 className={`font-bold text-base sm:text-lg ${criticalSensors.length > 0 ? 'text-red-700' : 'text-orange-700'}`}>
-              {criticalSensors.length > 0
-                ? `พบ ${totalDanger} จุดที่อยู่ในระดับอันตราย!`
-                : `พบ ${totalDanger} จุดที่ต้องเฝ้าระวัง`}
-            </h3>
-            <p className={`text-xs sm:text-sm mt-0.5 whitespace-nowrap ${criticalSensors.length > 0 ? 'text-red-600' : 'text-orange-600'}`}>
-              {criticalSensors.length > 0
-                ? 'มีพื้นที่ที่ระดับน้ำสูงถึงขั้นต้องอพยพ กรุณาดำเนินการทันที'
-                : 'มีพื้นที่ที่ระดับน้ำเริ่มสูงขึ้น ควรเตรียมพร้อมอพยพ'}
-            </p>
-          </div>
+    <div
+      className="rounded-xl border p-4 sm:p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+      style={{
+        backgroundColor: isCritical ? 'rgba(239,68,68,0.06)' : 'rgba(249,115,22,0.06)',
+        borderColor: isCritical ? 'rgba(239,68,68,0.15)' : 'rgba(249,115,22,0.15)',
+      }}
+    >
+      <div className="flex items-center gap-3 flex-1">
+        <span className="text-2xl">{isCritical ? '🚨' : '⚠️'}</span>
+        <div>
+          <h3 className="font-semibold text-gray-900">
+            พบ {total} จุด{isCritical ? 'อันตรายสูงสุด' : 'ที่อันตราย'}
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">
+            {isCritical ? 'น้ำสูงถึงขั้นต้องอพยพ ดำเนินการทันที' : 'น้ำเริ่มสูง เตรียมพร้อมอพยพ'}
+          </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {criticalSensors.map(s => (
-            <span key={s.id} className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">
-              🔴 {s.name} ({s.level} ซม.)
-            </span>
-          ))}
-          {dangerSensors.map(s => (
-            <span key={s.id} className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">
-              🟠 {s.name} ({s.level} ซม.)
-            </span>
-          ))}
-        </div>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        {critical.map(s => (
+          <span key={s.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color }}>
+            {s.name} ({s.level} ซม.)
+          </span>
+        ))}
+        {danger.map(s => (
+          <span key={s.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: 'rgba(249,115,22,0.1)', color }}>
+            {s.name} ({s.level} ซม.)
+          </span>
+        ))}
       </div>
     </div>
   )
 }
 
+// ===== Main App =====
 function App() {
   const [sensors, setSensors] = useState(initialSensors)
   const [filter, setFilter] = useState('all')
   const [mqttStatus, setMqttStatus] = useState('connecting')
+  const prevStatusRef = useRef({})
+  const playSound = useAlertSound()
   const clientRef = useRef(null)
 
   useEffect(() => {
@@ -240,28 +289,13 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
-      console.log('MQTT connected!')
       setMqttStatus('connected')
-      client.subscribe(MQTT_TOPIC, (err) => {
-        if (err) console.error('Subscribe error:', err)
-        else console.log('Subscribed to', MQTT_TOPIC)
-      })
+      client.subscribe(MQTT_TOPIC)
     })
 
-    client.on('error', (err) => {
-      console.error('MQTT error:', err)
-      setMqttStatus('error')
-    })
-
-    client.on('close', () => {
-      console.log('MQTT disconnected')
-      setMqttStatus('disconnected')
-    })
-
-    client.on('reconnect', () => {
-      console.log('MQTT reconnecting...')
-      setMqttStatus('connecting')
-    })
+    client.on('error', () => setMqttStatus('error'))
+    client.on('close', () => setMqttStatus('disconnected'))
+    client.on('reconnect', () => setMqttStatus('connecting'))
 
     client.on('message', (topic, message) => {
       const payload = message.toString().trim()
@@ -271,19 +305,31 @@ function App() {
         const now = new Date()
         const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-        setSensors(prev => prev.map(sensor => ({
-          ...sensor,
-          level: Math.round(distance),
-          lastUpdated: timeStr,
-          connected: true,
-        })))
+        setSensors(prev => prev.map(sensor => {
+          const newStatus = getWaterStatus(Math.round(distance))
+          const prevStatus = prevStatusRef.current[sensor.id]
+
+          // Play sound on status change
+          if (prevStatus && prevStatus !== newStatus) {
+            if (newStatus === 'critical') playSound('critical')
+            else if (newStatus === 'danger') playSound('danger')
+            else if (newStatus === 'warning') playSound('warning')
+            else playSound('safe')
+          }
+
+          prevStatusRef.current[sensor.id] = newStatus
+          return {
+            ...sensor,
+            level: Math.round(distance),
+            lastUpdated: timeStr,
+            connected: true,
+          }
+        }))
       }
     })
 
-    return () => {
-      client.end()
-    }
-  }, [])
+    return () => client.end()
+  }, [playSound])
 
   const stats = {
     total: sensors.length,
@@ -302,148 +348,119 @@ function App() {
     return getWaterStatus(sensor.level) === filter
   })
 
-  const statusColor = mqttStatus === 'connected' ? '#10b981' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
-  const statusText = mqttStatus === 'connected' ? 'เชื่อมต่อ MQTT แล้ว' : mqttStatus === 'error' ? 'MQTT ผิดพลาด' : 'กำลังเชื่อมต่อ MQTT...'
+  const statusColor = mqttStatus === 'connected' ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
+  const statusLabel = mqttStatus === 'connected' ? 'Live' : mqttStatus === 'error' ? 'Error' : 'Connecting'
+
+  const filterButtons = [
+    { key: 'all', label: 'All', count: stats.total, color: '#0f172a' },
+    { key: 'safe', label: 'Safe', count: stats.safe, color: '#22c55e' },
+    { key: 'warning', label: 'Warning', count: stats.warning, color: '#eab308' },
+    { key: 'danger', label: 'Danger', count: dangerCount, color: '#ef4444' },
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
+    <div className="min-h-screen bg-[#fafafa]">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/30 flex-shrink-0">
-                <span className="text-lg sm:text-xl">💧</span>
-              </div>
-              <div>
-                <h1 className="text-base sm:text-xl font-bold text-gray-800">AquaSense</h1>
-                <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
-              </div>
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+              </svg>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
-              <span className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75`} style={{ backgroundColor: statusColor }}></span>
-                <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: statusColor }}></span>
-              </span>
-              <span className="hidden xs:inline sm:inline" style={{ color: statusColor }}>{statusText}</span>
-            </div>
+            <span className="text-sm font-semibold text-gray-900 tracking-tight">AquaSense</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              {mqttStatus === 'connected' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50" style={{ backgroundColor: statusColor }}></span>}
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: statusColor }}></span>
+            </span>
+            <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: statusColor }}>{statusLabel}</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Danger Alert Banner */}
-        <DangerAlertBanner sensors={sensors} />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Alert Banner */}
+        <AlertBanner sensors={sensors} />
 
-        {/* สรุปสถานะ */}
-        <section className="mb-8 sm:mb-10">
-          <h2 className="text-base sm:text-lg font-bold text-gray-700 mb-4 sm:mb-5 flex items-center gap-2">
-            <span className="w-1 h-5 sm:h-6 bg-cyan-500 rounded-full"></span>
-            สรุปสถานะระดับน้ำ
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5">
-            <StatCard label="เซ็นเซอร์ทั้งหมด" count={stats.total} color="#6366f1" icon="📡" total={stats.total} />
-            <StatCard label="ปลอดภัย" count={stats.safe} color="#10b981" icon="✅" total={stats.total} />
-            <StatCard label="เฝ้าระวัง" count={stats.warning} color="#eab308" icon="⚡" total={stats.total} />
-            <StatCard label="อันตราย" count={dangerCount} color="#ef4444" icon="🚨" total={stats.total} />
+        {/* Filter Tabs — Linear style */}
+        <div className="flex items-center gap-1 mb-8 p-1 bg-gray-100 rounded-lg w-fit">
+          {filterButtons.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                filter === f.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {f.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                filter === f.key ? 'bg-gray-100 text-gray-600' : 'text-gray-400'
+              }`}>
+                {f.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Sensor Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-12">
+          {filteredSensors.map(sensor => (
+            <SensorCard key={sensor.id} sensor={sensor} />
+          ))}
+        </div>
+
+        {filteredSensors.length === 0 && (
+          <div className="text-center py-20">
+            <p className="text-sm text-gray-400">No sensors found</p>
           </div>
-        </section>
+        )}
 
-        {/* รายละเอียดเซ็นเซอร์ */}
-        <section>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-5 gap-3">
-            <h2 className="text-base sm:text-lg font-bold text-gray-700 flex items-center gap-2">
-              <span className="w-1 h-5 sm:h-6 bg-cyan-500 rounded-full"></span>
-              รายละเอียดระดับน้ำ
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: 'all', label: 'ทั้งหมด', count: stats.total, color: '#6366f1' },
-                { key: 'safe', label: '✅ ปลอดภัย', count: stats.safe, color: '#10b981' },
-                { key: 'warning', label: '⚡ เฝ้าระวัง', count: stats.warning, color: '#eab308' },
-                { key: 'danger', label: '🚨 อันตราย', count: dangerCount, color: '#ef4444' },
-              ].map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                    filter === f.key
-                      ? 'text-white shadow-md'
-                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                  style={filter === f.key ? { backgroundColor: f.color, boxShadow: `0 4px 14px ${f.color}40` } : {}}
-                >
-                  {f.label}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === f.key ? 'bg-white/20' : 'bg-gray-100'}`}>
-                    {f.count}
-                  </span>
-                </button>
-              ))}
+        {/* Legend — minimal */}
+        <div className="border-t border-gray-200/60 pt-8">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">เกณฑ์ระดับน้ำ</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-1 h-8 rounded-full bg-green-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">ปลอดภัย</p>
+                <p className="text-xs text-gray-400">&gt; 60 ซม. — ไม่ต้องอพยพ</p>
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {filteredSensors.map(sensor => (
-              <SensorCard key={sensor.id} sensor={sensor} />
-            ))}
-          </div>
-
-          {filteredSensors.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-              <div className="text-5xl mb-3">🔍</div>
-              <p className="text-gray-500">ไม่พบเซ็นเซอร์ในสถานะที่เลือก</p>
+            <div className="flex items-start gap-3">
+              <div className="w-1 h-8 rounded-full bg-yellow-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">เฝ้าระวัง</p>
+                <p className="text-xs text-gray-400">30–60 ซม. — ติดตามใกล้ชิด</p>
+              </div>
             </div>
-          )}
-        </section>
-
-        {/* เกณฑ์ระดับน้ำ */}
-        <section className="mt-8 sm:mt-10">
-          <h2 className="text-base sm:text-lg font-bold text-gray-700 mb-4 sm:mb-5 flex items-center gap-2">
-            <span className="w-1 h-5 sm:h-6 bg-cyan-500 rounded-full"></span>
-            เกณฑ์ระดับน้ำ
-          </h2>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-              <div className="p-4 sm:p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                  <span className="font-semibold text-sm text-gray-700">🟢 ปลอดภัย</span>
-                </div>
-                <p className="text-xs text-gray-500">น้ำ ≤ 50 ซม.</p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">ไม่จำเป็นต้องอพยพ</p>
+            <div className="flex items-start gap-3">
+              <div className="w-1 h-8 rounded-full bg-orange-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">อันตราย</p>
+                <p className="text-xs text-gray-400">10–30 ซม. — เตรียมอพยพ</p>
               </div>
-              <div className="p-4 sm:p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                  <span className="font-semibold text-sm text-gray-700">🟡 เฝ้าระวัง</span>
-                </div>
-                <p className="text-xs text-gray-500">น้ำ 50–100 ซม.</p>
-                <p className="text-xs text-yellow-600 font-medium mt-1">ติดตามสถานะอย่างใกล้ชิด</p>
-              </div>
-              <div className="p-4 sm:p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                  <span className="font-semibold text-sm text-gray-700">🟠 อันตราย</span>
-                </div>
-                <p className="text-xs text-gray-500">น้ำ 100–150 ซม.</p>
-                <p className="text-xs text-orange-600 font-medium mt-1">⚠️ เตรียมพร้อมอพยพ</p>
-              </div>
-              <div className="p-4 sm:p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                  <span className="font-semibold text-sm text-gray-700">🔴 อันตรายสูงสุด</span>
-                </div>
-                <p className="text-xs text-gray-500">น้ำ {'>'} 150 ซม.</p>
-                <p className="text-xs text-red-600 font-medium mt-1 whitespace-nowrap">🚨 ควรอพยพทันที!</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-1 h-8 rounded-full bg-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">อันตรายสูงสุด</p>
+                <p className="text-xs text-gray-400">&lt; 10 ซม. — อพยพทันที</p>
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </main>
 
-      <footer className="border-t border-gray-200 bg-white/50 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-gray-400">
-          AquaSense © 2026 — ระบบตรวจวัดระดับน้ำอัจฉริยะ
+      {/* Footer */}
+      <footer className="border-t border-gray-200/60 mt-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between">
+          <span className="text-xs text-gray-400">AquaSense © 2026</span>
+          <span className="text-xs text-gray-400">ระบบตรวจวัดระดับน้ำอัจฉริยะ</span>
         </div>
       </footer>
     </div>

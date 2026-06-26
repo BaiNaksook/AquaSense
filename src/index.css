@@ -7,62 +7,39 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Water shimmer animation for level bars */
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-shimmer {
-  animation: shimmer 2s infinite;
-}
-
-/* Smooth wave animation for decorative elements */
-@keyframes wave {
+/* Subtle pulse for danger cards — Stripe/Linear style */
+@keyframes subtle-pulse {
   0%, 100% {
-    transform: translateY(0);
+    opacity: 1;
   }
   50% {
-    transform: translateY(-6px);
+    opacity: 0.92;
   }
 }
 
-.animate-wave {
-  animation: wave 3s ease-in-out infinite;
-}
-
-/* Pulse glow for danger alerts */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+.animate-subtle-pulse {
+  animation: subtle-pulse 2s ease-in-out infinite;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 3px;
+  background: #d1d5db;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #9ca3af;
+}
+
+/* Smooth number transitions */
+.font-extrabold {
+  font-variant-numeric: tabular-nums;
 }
