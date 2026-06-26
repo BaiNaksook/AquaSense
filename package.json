@@ -11,7 +11,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "vite preview"
+    "start": "vite",
+    "serve": "vite preview"
   },
   "dependencies": {
     "mqtt": "^5.15.1",
