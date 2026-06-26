@@ -1,15 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import mqtt from 'mqtt'
 
-const initialSensors = [
-  { id: 'W-001', name: 'บ่อน้ำหน้าอาคาร A', location: 'อาคาร A ชั้น 1', level: 45, type: 'บ่อเก็บน้ำ', lastUpdated: '2 นาทีที่แล้ว' },
-  { id: 'W-002', name: 'ท่อระบายน้ำหลังอาคาร', location: 'อาคาร A หลัง', level: 178, type: 'ท่อระบายน้ำ', lastUpdated: '5 นาทีที่แล้ว' },
-  { id: 'W-003', name: 'ถังเก็บน้ำชั้นใต้ดิน', location: 'ใต้ดินอาคาร B', level: 85, type: 'ถังเก็บน้ำ', lastUpdated: '1 นาทีที่แล้ว' },
-  { id: 'W-004', name: 'บ่อน้ำโรงอาหาร', location: 'โรงอาหารชั้น 2', level: 152, type: 'บ่อเก็บน้ำ', lastUpdated: '3 นาทีที่แล้ว' },
-  { id: 'W-005', name: 'ท่อระบายน้ำห้องพัก A1', location: 'อาคาร A ชั้น 1', level: 30, type: 'ท่อระบายน้ำ', lastUpdated: '10 นาทีที่แล้ว' },
-  { id: 'W-006', name: 'ถังเก็บน้ำห้องพัก A2', location: 'อาคาร A ชั้น 2', level: 15, type: 'ถังเก็บน้ำ', lastUpdated: '8 นาทีที่แล้ว' },
-  { id: 'W-007', name: 'บ่อน้ำล็อบบี้', location: 'ล็อบบี้อาคาร B', level: 110, type: 'บ่อเก็บน้ำ', lastUpdated: '4 นาทีที่แล้ว' },
-  { id: 'W-008', name: 'ท่อระบายน้ำโซนจัดส่ง', location: 'โซนจัดส่ง', level: 62, type: 'ท่อระบายน้ำ', lastUpdated: '15 นาทีที่แล้ว' },
+// ===== MQTT Config =====
+const MQTT_URL = 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884/mqtt'
+const MQTT_USERNAME = 'Data-Dashbord'
+const MQTT_PASSWORD = 'PsR12345678'
+const MQTT_TOPIC = 'aquasense/sensor/distance'
+
+// ===== ตั้งค่าเซ็นเซอร์ =====
+const sensorConfig = [
+  { id: 'W-001', name: 'บ่อน้ำหน้าอาคาร A', location: 'อาคาร A ชั้น 1', type: 'บ่อเก็บน้ำ' },
 ]
+
+const initialSensors = sensorConfig.map(s => ({
+  ...s,
+  level: 0,
+  lastUpdated: '-',
+  connected: false,
+}))
 
 // เกณฑ์ตัดสินจากระดับน้ำ (ซม.) ตรงๆ
 // safe: < 50 ซม., warning: 50-100 ซม., danger: 100-150 ซม., critical: > 150 ซม.
@@ -104,7 +112,7 @@ function SensorCard({ sensor }) {
       {/* ระดับน้ำ ตัวเลขใหญ่ */}
       <div className="text-center py-4 mb-3 rounded-xl" style={{ backgroundColor: config.colorLight }}>
         <div className="text-4xl sm:text-5xl font-extrabold tracking-tight" style={{ color: config.color }}>
-          {sensor.level}
+          {sensor.connected ? sensor.level : '--'}
         </div>
         <div className="text-sm font-medium mt-1" style={{ color: config.color }}>
           เซนติเมตร (ซม.)
@@ -116,25 +124,33 @@ function SensorCard({ sensor }) {
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">สถานะ:</span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: config.colorLight, color: config.color }}>
-            {config.icon} {config.label}
+            {sensor.connected ? `${config.icon} ${config.label}` : '⏳ รอข้อมูล'}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">อพยพ:</span>
-          {config.shouldEvacuate ? (
-            <span className="text-xs font-bold whitespace-nowrap" style={{ color: config.color }}>
-              {config.evacuateText}
-            </span>
+          {sensor.connected ? (
+            config.shouldEvacuate ? (
+              <span className="text-xs font-bold whitespace-nowrap" style={{ color: config.color }}>
+                {config.evacuateText}
+              </span>
+            ) : (
+              <span className="text-xs text-emerald-600 font-medium">✅ ไม่จำเป็น</span>
+            )
           ) : (
-            <span className="text-xs text-emerald-600 font-medium">✅ ไม่จำเป็น</span>
+            <span className="text-xs text-gray-400">รอเชื่อมต่อ...</span>
           )}
         </div>
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md font-medium">{sensor.type}</span>
-        <span className="text-xs text-gray-400">อัปเดต {sensor.lastUpdated}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md font-medium">{sensor.type}</span>
+          <span className={`w-2 h-2 rounded-full ${sensor.connected ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          <span className="text-[10px] text-gray-400">{sensor.connected ? 'เชื่อมต่อ' : 'ไม่เชื่อมต่อ'}</span>
+        </div>
+        <span className="text-xs text-gray-400">{sensor.lastUpdated}</span>
       </div>
     </div>
   )
@@ -164,8 +180,9 @@ function StatCard({ label, count, color, icon, total }) {
 }
 
 function DangerAlertBanner({ sensors }) {
-  const criticalSensors = sensors.filter(s => getWaterStatus(s.level) === 'critical')
-  const dangerSensors = sensors.filter(s => getWaterStatus(s.level) === 'danger')
+  const activeSensors = sensors.filter(s => s.connected)
+  const criticalSensors = activeSensors.filter(s => getWaterStatus(s.level) === 'critical')
+  const dangerSensors = activeSensors.filter(s => getWaterStatus(s.level) === 'danger')
   const totalDanger = criticalSensors.length + dangerSensors.length
 
   if (totalDanger === 0) return null
@@ -208,33 +225,85 @@ function DangerAlertBanner({ sensors }) {
 function App() {
   const [sensors, setSensors] = useState(initialSensors)
   const [filter, setFilter] = useState('all')
+  const [mqttStatus, setMqttStatus] = useState('connecting')
+  const clientRef = useRef(null)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSensors(prev => prev.map(sensor => {
-        const change = Math.floor(Math.random() * 11) - 3
-        const newLevel = Math.max(0, sensor.level + change)
-        return { ...sensor, level: newLevel }
-      }))
-    }, 5000)
-    return () => clearInterval(interval)
+    const client = mqtt.connect(MQTT_URL, {
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD,
+      clientId: 'AquaSenseWeb_' + Math.random().toString(16).substr(2, 8),
+      clean: true,
+      connectTimeout: 10000,
+      reconnectPeriod: 5000,
+    })
+    clientRef.current = client
+
+    client.on('connect', () => {
+      console.log('MQTT connected!')
+      setMqttStatus('connected')
+      client.subscribe(MQTT_TOPIC, (err) => {
+        if (err) console.error('Subscribe error:', err)
+        else console.log('Subscribed to', MQTT_TOPIC)
+      })
+    })
+
+    client.on('error', (err) => {
+      console.error('MQTT error:', err)
+      setMqttStatus('error')
+    })
+
+    client.on('close', () => {
+      console.log('MQTT disconnected')
+      setMqttStatus('disconnected')
+    })
+
+    client.on('reconnect', () => {
+      console.log('MQTT reconnecting...')
+      setMqttStatus('connecting')
+    })
+
+    client.on('message', (topic, message) => {
+      const payload = message.toString().trim()
+      const distance = parseFloat(payload)
+
+      if (!isNaN(distance) && distance >= 0) {
+        const now = new Date()
+        const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+        setSensors(prev => prev.map(sensor => ({
+          ...sensor,
+          level: Math.round(distance),
+          lastUpdated: timeStr,
+          connected: true,
+        })))
+      }
+    })
+
+    return () => {
+      client.end()
+    }
   }, [])
 
   const stats = {
     total: sensors.length,
-    safe: sensors.filter(s => getWaterStatus(s.level) === 'safe').length,
-    warning: sensors.filter(s => getWaterStatus(s.level) === 'warning').length,
-    danger: sensors.filter(s => getWaterStatus(s.level) === 'danger').length,
-    critical: sensors.filter(s => getWaterStatus(s.level) === 'critical').length,
+    safe: sensors.filter(s => s.connected && getWaterStatus(s.level) === 'safe').length,
+    warning: sensors.filter(s => s.connected && getWaterStatus(s.level) === 'warning').length,
+    danger: sensors.filter(s => s.connected && getWaterStatus(s.level) === 'danger').length,
+    critical: sensors.filter(s => s.connected && getWaterStatus(s.level) === 'critical').length,
   }
 
   const dangerCount = stats.danger + stats.critical
 
   const filteredSensors = sensors.filter(sensor => {
     if (filter === 'all') return true
+    if (!sensor.connected) return filter === 'all'
     if (filter === 'danger') return getWaterStatus(sensor.level) === 'danger' || getWaterStatus(sensor.level) === 'critical'
     return getWaterStatus(sensor.level) === filter
   })
+
+  const statusColor = mqttStatus === 'connected' ? '#10b981' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
+  const statusText = mqttStatus === 'connected' ? 'เชื่อมต่อ MQTT แล้ว' : mqttStatus === 'error' ? 'MQTT ผิดพลาด' : 'กำลังเชื่อมต่อ MQTT...'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
@@ -251,12 +320,12 @@ function App() {
                 <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-500">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75`} style={{ backgroundColor: statusColor }}></span>
+                <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: statusColor }}></span>
               </span>
-              <span className="hidden xs:inline sm:inline">อัปเดตแบบเรียลไทม์</span>
+              <span className="hidden xs:inline sm:inline" style={{ color: statusColor }}>{statusText}</span>
             </div>
           </div>
         </div>
