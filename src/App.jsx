@@ -150,6 +150,18 @@ function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    if (!sidebarOpen) {
+      document.body.style.overflow = ''
+      return
+    }
+
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [sidebarOpen])
+
   const status = distance !== null ? getWaterStatus(distance) : 'safe'
   const config = STATUS_CONFIG[status]
   const isAlert = status === 'danger' || status === 'critical'
@@ -251,7 +263,7 @@ function App() {
 
       {/* ===== Sidebar ===== */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 max-w-[82vw] bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-full sm:w-72 max-w-full bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:static lg:w-64 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
