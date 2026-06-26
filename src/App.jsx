@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Map, Bell, BarChart3, Settings, Info, Zap, Sun, Moon } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu } from 'lucide-react'
 import mqtt from 'mqtt'
 
 // ===== MQTT Config =====
@@ -91,21 +91,26 @@ function useAlertSound() {
         osc.start(ctx.currentTime)
         osc.stop(ctx.currentTime + 0.2)
       }
-    } catch (_) {}
+    } catch {
+      return
+    }
   }, [])
 
   return play
 }
 
 // ===== Status Card =====
-function StatusCard({ icon: Icon, label, range, desc, color, isActive }) {
+function StatusCard({ icon: Icon, label, range, desc, color, isActive, theme }) {
+  const inactiveBg = theme === 'dark' ? '#111827' : '#ffffff'
+  const inactiveBorder = theme === 'dark' ? '#374151' : 'rgba(0,0,0,0.08)'
+
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       className="p-4 rounded-lg border transition-all duration-300"
       style={{
-        backgroundColor: isActive ? color + '10' : '#ffffff',
-        borderColor: isActive ? color : 'rgba(0,0,0,0.08)',
+        backgroundColor: isActive ? color + '10' : inactiveBg,
+        borderColor: isActive ? color : inactiveBorder,
       }}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -133,9 +138,9 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState('')
   const [soundOn, setSoundOn] = useState(true)
   const [history, setHistory] = useState([])
-  const [filter, setFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState('home')
   const [chartHoverPoint, setChartHoverPoint] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const alertIntervalRef = useRef(null)
   const playSound = useAlertSound()
@@ -218,9 +223,12 @@ function App() {
   const mqttColor = mqttStatus === 'connected' ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
   const mqttText = mqttStatus === 'connected' ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    setSidebarOpen(false)
+  }
 
   // Chart calculations
-  const chartMinValue = 0
   const chartMaxValue = Math.max(...history, 200)
   const sparklinePoints = history.length > 1
     ? history.map((v, i) => {
@@ -231,9 +239,22 @@ function App() {
     : []
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="ปิดเมนู"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+        />
+      )}
+
       {/* ===== Sidebar ===== */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <div
+        className={`fixed inset-y-0 left-0 z-40 w-64 max-w-[82vw] bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:static lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
@@ -246,7 +267,7 @@ function App() {
         <nav className="flex-1 p-4 space-y-2">
           <motion.button
             whileHover={{ x: 4 }}
-            onClick={() => setCurrentPage('home')}
+            onClick={() => handlePageChange('home')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'home' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
             }`}
@@ -256,7 +277,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onClick={() => setCurrentPage('alerts')}
+            onClick={() => handlePageChange('alerts')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'alerts' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
             }`}
@@ -266,7 +287,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onClick={() => setCurrentPage('settings')}
+            onClick={() => handlePageChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
             }`}
@@ -276,7 +297,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onClick={() => setCurrentPage('about')}
+            onClick={() => handlePageChange('about')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'about' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
             }`}
@@ -304,8 +325,16 @@ function App() {
       {/* ===== Main Content ===== */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              aria-label="เปิดเมนู"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-gray-600 hover:text-gray-900 transition-all p-1.5 rounded-lg hover:bg-gray-100"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 {mqttStatus === 'connected' && (
@@ -319,35 +348,35 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-3 py-1.5 rounded-lg hover:bg-gray-100"
+              className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100"
               aria-label="สลับธีม"
               title="สลับโหมดกลางวัน/กลางคืน"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              <span className="text-xs font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+              <span className="hidden sm:inline text-xs font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </motion.button>
 
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setSoundOn(!soundOn)} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-3 py-1.5 rounded-lg hover:bg-gray-100">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setSoundOn(!soundOn)} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
               <Radio className="w-4 h-4" strokeWidth={soundOn ? 2.5 : 2} />
-              <span className="text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
+              <span className="hidden sm:inline text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
             </motion.button>
           </div>
         </div>
 
         {/* Content Scroll */}
         <div className="flex-1 overflow-auto">
-          <div className="p-8">
+          <div className="p-4 sm:p-8">
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
-                <div className="grid grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
-              <motion.div layout className="col-span-1 rounded-lg border bg-white p-6" style={{ borderColor: config.border, boxShadow: `0 0 20px ${config.bg}` }}>
+              <motion.div layout className="lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ borderColor: config.border, boxShadow: `0 0 20px ${config.bg}` }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
@@ -359,7 +388,7 @@ function App() {
                 </div>
 
                 <div className="mb-4">
-                  <motion.span className="text-6xl font-black tracking-tight" style={{ color: config.color }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
+                  <motion.span className="text-5xl sm:text-6xl font-black tracking-tight" style={{ color: config.color }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
                     {distance ?? '--'}
                   </motion.span>
                   <span className="text-sm font-medium text-gray-500 ml-2">ซม.</span>
@@ -376,7 +405,7 @@ function App() {
 
               {/* Chart Card */}
               {history.length > 1 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="col-span-2 rounded-lg border bg-white p-6">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-2 rounded-lg border bg-white p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-sm font-bold text-gray-900">กราฟระดับน้ำ(24 ชม.)</h3>
                   </div>
@@ -461,7 +490,7 @@ function App() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute top-2 right-2 bg-white rounded-lg border border-gray-200 p-3 shadow-sm"
+                        className="absolute top-2 right-2 bg-white rounded-lg border border-gray-200 p-2 sm:p-3 shadow-sm"
                       >
                         <div className="text-xs text-gray-600 font-medium">
                           {new Date(new Date().getTime() - (history.length - 1 - chartHoverPoint) * 60000).toLocaleTimeString('th-TH', {
@@ -481,37 +510,37 @@ function App() {
             {/* Status Cards */}
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
-              <div className="grid grid-cols-4 gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 60 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="30–60 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="10–30 ซม." desc="เตรียมอพยพ" color="#f97316" isActive={status === 'danger' && connected} />
-                <StatusCard icon={AlertTriangle} label="อันตรายสูงสุด" range="< 10 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'critical' && connected} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 60 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="30–60 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="10–30 ซม." desc="เตรียมอพยพ" color="#f97316" isActive={status === 'danger' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตรายสูงสุด" range="< 10 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'critical' && connected} theme={theme} />
               </div>
             </div>
 
             {/* Activity Table */}
             <div className="rounded-lg border bg-white overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-sm font-bold text-gray-900">ประวัติการแจ้เตือน</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b border-gray-200 bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">เวลา</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">สถานที่</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">จุดตรวจวัด</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">ระดับน้ำ</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">สถานะ</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานที่</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">จุดตรวจวัด</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระดับน้ำ</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะ</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-6 py-3 text-gray-600">{lastUpdated}</td>
-                      <td className="px-6 py-3 text-gray-900 font-medium">วัดต้นสน เพชรบุรี</td>
-                      <td className="px-6 py-3 text-gray-600">แม่น้ำ</td>
-                      <td className="px-6 py-3 text-gray-900 font-medium">{distance ?? '--'} ซม.</td>
-                      <td className="px-6 py-3">
+                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">วัดต้นสน เพชรบุรี</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">แม่น้ำ</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
+                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: config.bg, color: config.color }}>
                           {config.label}
                         </span>
@@ -527,26 +556,26 @@ function App() {
             {/* Alert History Page */}
             {currentPage === 'alerts' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">ประวตัิการเเจ้เตือน</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ประวตัิการเเจ้เตือน</h2>
                 <div className="rounded-lg border bg-white overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="border-b border-gray-200 bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">เวลา</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">สถานที่</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">จุดตรวจวัด</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">ระดับน้ำ</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600">สถานะ</th>
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานที่</th>
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">จุดตรวจวัด</th>
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระดับน้ำ</th>
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะ</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="px-6 py-3 text-gray-600">{lastUpdated}</td>
-                          <td className="px-6 py-3 text-gray-900 font-medium">วัดต้นสน เพชรบุรี</td>
-                          <td className="px-6 py-3 text-gray-600">แม่น้ำ</td>
-                          <td className="px-6 py-3 text-gray-900 font-medium">{distance ?? '--'} ซม.</td>
-                          <td className="px-6 py-3">
+                          <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
+                          <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">วัดต้นสน เพชรบุรี</td>
+                          <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">แม่น้ำ</td>
+                          <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
+                          <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
                             <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: config.bg, color: config.color }}>
                               {config.label}
                             </span>
@@ -562,10 +591,10 @@ function App() {
             {/* Settings Page */}
             {currentPage === 'settings' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">ตั้งค่า</h2>
-                <div className="rounded-lg border bg-white p-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ตั้งค่า</h2>
+                <div className="rounded-lg border bg-white p-4 sm:p-6">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
                       <div>
                         <p className="font-medium text-gray-900">ธีมหน้าจอ</p>
                         <p className="text-sm text-gray-500">สลับโหมดกลางวัน / กลางคืน</p>
@@ -578,7 +607,7 @@ function App() {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
                       <div>
                         <p className="font-medium text-gray-900">เสียงเตือน</p>
                         <p className="text-sm text-gray-500">เล่นเสียงเตือนเมื่อระดับน้ำอันตราย</p>
@@ -602,8 +631,8 @@ function App() {
             {/* About Page */}
             {currentPage === 'about' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">เกี่ยวกับระบบ</h2>
-                <div className="rounded-lg border bg-white p-6 space-y-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">เกี่ยวกับระบบ</h2>
+                <div className="rounded-lg border bg-white p-4 sm:p-6 space-y-4">
                   <div>
                     <p className="font-medium text-gray-900">AquaSense</p>
                     <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
