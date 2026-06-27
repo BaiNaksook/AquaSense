@@ -122,7 +122,14 @@ function useClickSound() {
       const gain = ctx.createGain()
       osc.connect(gain)
       gain.connect(ctx.destination)
-      if (type === 'toggle-on') {
+      if (type === 'hover') {
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(1200, ctx.currentTime)
+        gain.gain.setValueAtTime(0.025, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.04)
+      } else if (type === 'toggle-on') {
         osc.frequency.setValueAtTime(600, ctx.currentTime)
         osc.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.08)
         gain.gain.setValueAtTime(0.08, ctx.currentTime)
@@ -421,6 +428,7 @@ function App() {
         <nav className="flex-1 p-4 space-y-2">
           <motion.button
             whileHover={{ x: 4 }}
+            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('home')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'home' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -431,6 +439,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
+            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('alerts')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'alerts' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -441,6 +450,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
+            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -451,6 +461,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
+            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('map')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'map' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -461,6 +472,7 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
+            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('about')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'about' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -494,6 +506,7 @@ function App() {
             <button
               type="button"
               aria-label="เปิดเมนู"
+              onMouseEnter={() => playClick('hover')}
               onClick={() => { playClick(); setSidebarOpen(true) }}
               className="lg:hidden text-gray-600 hover:text-gray-900 transition-all p-1.5 rounded-lg hover:bg-gray-100"
             >
@@ -516,6 +529,7 @@ function App() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onMouseEnter={() => playClick('hover')}
               onClick={toggleTheme}
               className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100"
               aria-label="สลับธีม"
@@ -528,6 +542,7 @@ function App() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onMouseEnter={() => playClick('hover')}
               onClick={toggleSensor}
               className={`flex items-center gap-1.5 transition-all px-2 sm:px-3 py-1.5 rounded-lg ${
                 sensorOn ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'
@@ -538,7 +553,7 @@ function App() {
               <span className="hidden sm:inline text-xs font-medium">{sensorOn ? 'Sensor On' : 'Sensor Off'}</span>
             </motion.button>
 
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { playClick(soundOn ? 'toggle-off' : 'toggle-on'); setSoundOn(!soundOn) }} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onMouseEnter={() => playClick('hover')} onClick={() => { playClick(soundOn ? 'toggle-off' : 'toggle-on'); setSoundOn(!soundOn) }} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
               <Radio className="w-4 h-4" strokeWidth={soundOn ? 2.5 : 2} />
               <span className="hidden sm:inline text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
             </motion.button>
