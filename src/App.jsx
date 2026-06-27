@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu } from 'lucide-react'
+import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power } from 'lucide-react'
 import mqtt from 'mqtt'
 
 // ===== MQTT Config =====
@@ -8,6 +8,7 @@ const MQTT_URL = 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884
 const MQTT_USERNAME = 'Data-Dashbord'
 const MQTT_PASSWORD = 'PsR12345678'
 const MQTT_TOPIC = 'aquasense/sensor/distance'
+const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 
 // ===== Status Logic =====
 function getWaterStatus(distance) {
@@ -141,8 +142,10 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [chartHoverPoint, setChartHoverPoint] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sensorOn, setSensorOn] = useState(true)
 
   const alertIntervalRef = useRef(null)
+  const mqttClientRef = useRef(null)
   const playSound = useAlertSound()
 
   useEffect(() => {
@@ -202,7 +205,10 @@ function App() {
     client.on('connect', () => {
       setMqttStatus('connected')
       client.subscribe(MQTT_TOPIC)
+      client.publish(MQTT_CONTROL_TOPIC, 'ON', { retain: true })
     })
+
+    mqttClientRef.current = client
 
     client.on('error', () => setMqttStatus('error'))
     client.on('close', () => setMqttStatus('connecting'))
@@ -235,6 +241,14 @@ function App() {
   const mqttColor = mqttStatus === 'connected' ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
   const mqttText = mqttStatus === 'connected' ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+
+  const toggleSensor = () => {
+    const next = !sensorOn
+    setSensorOn(next)
+    if (mqttClientRef.current) {
+      mqttClientRef.current.publish(MQTT_CONTROL_TOPIC, next ? 'ON' : 'OFF', { retain: true })
+    }
+  }
   const handlePageChange = (page) => {
     setCurrentPage(page)
     setSidebarOpen(false)
@@ -371,6 +385,19 @@ function App() {
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               <span className="hidden sm:inline text-xs font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleSensor}
+              className={`flex items-center gap-1.5 transition-all px-2 sm:px-3 py-1.5 rounded-lg ${
+                sensorOn ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'
+              }`}
+              title="เปิด/ปิดเซ็นเซอร์ ESP32"
+            >
+              <Power className="w-4 h-4" strokeWidth={2.5} />
+              <span className="hidden sm:inline text-xs font-medium">{sensorOn ? 'Sensor On' : 'Sensor Off'}</span>
             </motion.button>
 
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setSoundOn(!soundOn)} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
@@ -606,6 +633,24 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ตั้งค่า</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6">
                   <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
+                      <div>
+                        <p className="font-medium text-gray-900">เซ็นเซอร์วัดระยะ ESP32</p>
+                        <p className="text-sm text-gray-500">เปิด/ปิดการทำงานของเซ็นเซอร์ผ่าน MQTT</p>
+                      </div>
+                      <button
+                        onClick={toggleSensor}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          sensorOn
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Power className="w-4 h-4" />
+                        {sensorOn ? 'เปิดอยู่' : 'ปิดอยู่'}
+                      </button>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
                       <div>
                         <p className="font-medium text-gray-900">ธีมหน้าจอ</p>
