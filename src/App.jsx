@@ -111,6 +111,42 @@ function useAlertSound() {
   return play
 }
 
+// ===== Click Sound =====
+function useClickSound() {
+  const ctxRef = useRef(null)
+  return useCallback((type = 'default') => {
+    try {
+      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      const ctx = ctxRef.current
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      if (type === 'toggle-on') {
+        osc.frequency.setValueAtTime(600, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.08)
+        gain.gain.setValueAtTime(0.08, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.12)
+      } else if (type === 'toggle-off') {
+        osc.frequency.setValueAtTime(500, ctx.currentTime)
+        osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.08)
+        gain.gain.setValueAtTime(0.08, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.12)
+      } else {
+        osc.frequency.setValueAtTime(700, ctx.currentTime)
+        gain.gain.setValueAtTime(0.06, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.07)
+      }
+    } catch { return }
+  }, [])
+}
+
 // ===== WiFi Bars =====
 function WifiBars({ rssi }) {
   // rssi: -30 (excellent) to -90 (poor)
@@ -187,6 +223,7 @@ function App() {
   const alertIntervalRef = useRef(null)
   const mqttClientRef = useRef(null)
   const playSound = useAlertSound()
+  const playClick = useClickSound()
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -256,20 +293,17 @@ function App() {
 
     client.on('message', (_topic, message) => {
       const payload = message.toString().trim()
-      // Try JSON first {"distance":xx,"rssi":xx}
-      let d = null
-      try {
-        const obj = JSON.parse(payload)
-        if (obj !== null && typeof obj === 'object' && typeof obj.distance === 'number') {
-          d = obj.distance
-          if (typeof obj.rssi === 'number') setRssi(obj.rssi)
-        } else {
-          d = parseFloat(payload)
-        }
-      } catch {
-        d = parseFloat(payload)
-      }
-      if (d !== null && !isNaN(d) && d >= 0) {
+      const { d, rssi: incomingRssi } = (() => {
+        try {
+          const obj = JSON.parse(payload)
+          if (obj !== null && typeof obj === 'object' && typeof obj.distance === 'number') {
+            return { d: obj.distance, rssi: typeof obj.rssi === 'number' ? obj.rssi : null }
+          }
+        } catch { /* plain number */ }
+        return { d: parseFloat(payload), rssi: null }
+      })()
+      if (incomingRssi !== null) setRssi(incomingRssi)
+      if (!isNaN(d) && d >= 0) {
         const rounded = Math.round(d)
         setDistance(rounded)
         setConnected(true)
@@ -315,18 +349,22 @@ function App() {
     }
   }, [status, distance])
 
-  const mqttColor = mqttStatus === 'connected' ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
-  const mqttText = mqttStatus === 'connected' ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  // display status: ถ้ามีข้อมูลจริงให้ถือว่า connected
+  const displayConnected = connected || mqttStatus === 'connected'
+  const mqttColor = displayConnected ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
+  const mqttText = displayConnected ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
+  const toggleTheme = () => { playClick('toggle-on'); setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')) }
 
   const toggleSensor = () => {
     const next = !sensorOn
     setSensorOn(next)
+    playClick(next ? 'toggle-on' : 'toggle-off')
     if (mqttClientRef.current) {
       mqttClientRef.current.publish(MQTT_CONTROL_TOPIC, next ? 'ON' : 'OFF', { retain: true })
     }
   }
   const handlePageChange = (page) => {
+    playClick()
     setCurrentPage(page)
     setSidebarOpen(false)
   }
@@ -456,7 +494,7 @@ function App() {
             <button
               type="button"
               aria-label="เปิดเมนู"
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => { playClick(); setSidebarOpen(true) }}
               className="lg:hidden text-gray-600 hover:text-gray-900 transition-all p-1.5 rounded-lg hover:bg-gray-100"
             >
               <Menu className="w-5 h-5" />
@@ -500,7 +538,7 @@ function App() {
               <span className="hidden sm:inline text-xs font-medium">{sensorOn ? 'Sensor On' : 'Sensor Off'}</span>
             </motion.button>
 
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setSoundOn(!soundOn)} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { playClick(soundOn ? 'toggle-off' : 'toggle-on'); setSoundOn(!soundOn) }} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
               <Radio className="w-4 h-4" strokeWidth={soundOn ? 2.5 : 2} />
               <span className="hidden sm:inline text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
             </motion.button>
