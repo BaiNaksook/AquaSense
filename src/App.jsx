@@ -141,6 +141,7 @@ function App() {
   const [history, setHistory] = useState([])
   const [currentPage, setCurrentPage] = useState('home')
   const [chartHoverPoint, setChartHoverPoint] = useState(null)
+  const [chartMousePos, setChartMousePos] = useState({ x: 0, y: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sensorOn, setSensorOn] = useState(true)
 
@@ -487,6 +488,13 @@ function App() {
                             setChartHoverPoint(closestIndex)
                           }
                         }
+
+                        const container = svg.closest('.relative')
+                        const containerRect = container.getBoundingClientRect()
+                        setChartMousePos({
+                          x: e.clientX - containerRect.left,
+                          y: e.clientY - containerRect.top,
+                        })
                       }}
                       onMouseLeave={() => setChartHoverPoint(null)}
                       style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}
@@ -551,9 +559,14 @@ function App() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute top-2 right-2 bg-white rounded-lg border border-gray-200 p-2 sm:p-3 shadow-sm"
+                        className="absolute pointer-events-none z-10 bg-white rounded-lg border border-gray-200 p-2 sm:p-3 shadow-md"
+                        style={{
+                          left: chartMousePos.x + 14,
+                          top: chartMousePos.y - 48,
+                          transform: chartMousePos.x > 300 ? 'translateX(-110%)' : 'translateX(0)',
+                        }}
                       >
-                        <div className="text-xs text-gray-600 font-medium">
+                        <div className="text-xs text-gray-600 font-medium whitespace-nowrap">
                           {new Date(new Date().getTime() - (history.length - 1 - chartHoverPoint) * 60000).toLocaleTimeString('th-TH', {
                             hour: '2-digit',
                             minute: '2-digit',
