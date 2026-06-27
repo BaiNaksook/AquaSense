@@ -15,13 +15,15 @@
     "serve": "vite preview"
   },
   "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.42.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.21.0",
     "mqtt": "^5.15.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "framer-motion": "^12.42.0",
-    "lucide-react": "^1.21.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
+    "react-leaflet": "^5.0.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

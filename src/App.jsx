@@ -1,7 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power } from 'lucide-react'
+import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus, MapPin } from 'lucide-react'
 import mqtt from 'mqtt'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix leaflet default icon
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 // ===== MQTT Config =====
 const MQTT_URL = 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884/mqtt'
@@ -100,6 +111,29 @@ function useAlertSound() {
   return play
 }
 
+// ===== WiFi Bars =====
+function WifiBars({ rssi }) {
+  // rssi: -30 (excellent) to -90 (poor)
+  const bars = rssi >= -55 ? 4 : rssi >= -65 ? 3 : rssi >= -75 ? 2 : 1
+  const color = rssi >= -55 ? '#22c55e' : rssi >= -65 ? '#eab308' : rssi >= -75 ? '#f97316' : '#ef4444'
+  return (
+    <span className="flex items-end gap-[2px]" title={`WiFi: ${rssi} dBm`}>
+      {[1, 2, 3, 4].map((b) => (
+        <span
+          key={b}
+          style={{
+            display: 'inline-block',
+            width: '3px',
+            height: `${b * 4}px`,
+            borderRadius: '1px',
+            backgroundColor: b <= bars ? color : '#d1d5db',
+          }}
+        />
+      ))}
+    </span>
+  )
+}
+
 // ===== Status Card =====
 function StatusCard({ icon: Icon, label, range, desc, color, isActive, theme }) {
   const inactiveBg = theme === 'dark' ? '#111827' : '#ffffff'
@@ -144,6 +178,11 @@ function App() {
   const [chartMousePos, setChartMousePos] = useState({ x: 0, y: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sensorOn, setSensorOn] = useState(true)
+  const [rssi, setRssi] = useState(null)
+  const [alertLog, setAlertLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('alertLog') || '[]') } catch { return [] }
+  })
+  const prevStatusRef = useRef(null)
 
   const alertIntervalRef = useRef(null)
   const mqttClientRef = useRef(null)
@@ -217,8 +256,20 @@ function App() {
 
     client.on('message', (_topic, message) => {
       const payload = message.toString().trim()
-      const d = parseFloat(payload)
-      if (!isNaN(d) && d >= 0) {
+      // Try JSON first {"distance":xx,"rssi":xx}
+      let d = null
+      try {
+        const obj = JSON.parse(payload)
+        if (obj !== null && typeof obj === 'object' && typeof obj.distance === 'number') {
+          d = obj.distance
+          if (typeof obj.rssi === 'number') setRssi(obj.rssi)
+        } else {
+          d = parseFloat(payload)
+        }
+      } catch {
+        d = parseFloat(payload)
+      }
+      if (d !== null && !isNaN(d) && d >= 0) {
         const rounded = Math.round(d)
         setDistance(rounded)
         setConnected(true)
@@ -238,6 +289,31 @@ function App() {
       if (alertIntervalRef.current) clearInterval(alertIntervalRef.current)
     }
   }, [])
+
+  // ===== Alert log on status change =====
+  useEffect(() => {
+    if (distance === null) return
+    if (prevStatusRef.current === null) {
+      prevStatusRef.current = status
+      return
+    }
+    if (prevStatusRef.current !== status) {
+      const entry = {
+        id: Date.now(),
+        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        date: new Date().toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        distance,
+        status,
+        prevStatus: prevStatusRef.current,
+      }
+      setAlertLog((prev) => {
+        const updated = [entry, ...prev].slice(0, 100)
+        localStorage.setItem('alertLog', JSON.stringify(updated))
+        return updated
+      })
+      prevStatusRef.current = status
+    }
+  }, [status, distance])
 
   const mqttColor = mqttStatus === 'connected' ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
   const mqttText = mqttStatus === 'connected' ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
@@ -264,6 +340,19 @@ function App() {
         return { x, y, value: v }
       })
     : []
+
+  // ===== Trend =====
+  // distance = ระยะจากเซ็นเซอร์ถึงผิวน้ำ
+  // distance ลด = น้ำขึ้น | distance เพิ่ม = น้ำลง
+  const trend = (() => {
+    if (history.length < 4) return 'stable'
+    const recent = history.slice(-4)
+    const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
+    const diff = avg(recent.slice(2)) - avg(recent.slice(0, 2))
+    if (diff < -1) return 'rising'   // distance ลด = น้ำขึ้น
+    if (diff > 1) return 'falling'   // distance เพิ่ม = น้ำลง
+    return 'stable'
+  })()
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -321,6 +410,16 @@ function App() {
           >
             <Settings className="w-4 h-4" />
             <span className="text-sm">ตั้งค่า</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ x: 4 }}
+            onClick={() => handlePageChange('map')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
+              currentPage === 'map' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <MapPin className="w-4 h-4" />
+            <span className="text-sm">แผนที่จุดตรวจวัด</span>
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
@@ -448,6 +547,23 @@ function App() {
 
                 <h3 className="text-sm font-bold text-gray-900 mb-1">แม่น้ำ</h3>
                 <p className="text-xs text-gray-500 mb-4">{connected ? config.evacuate : 'รอข้อมูล'}</p>
+
+                {/* WiFi RSSI */}
+                {rssi !== null && (
+                  <div className="flex items-center gap-1.5 mb-2 text-xs">
+                    <WifiBars rssi={rssi} />
+                    <span className="text-gray-400">{rssi} dBm</span>
+                  </div>
+                )}
+
+                {/* Trend indicator */}
+                {history.length >= 4 && !(trend === 'stable' && isAlert) && (
+                  <div className="flex items-center gap-1.5 mb-4 text-xs font-medium">
+                    {trend === 'rising' && <><TrendingUp className="w-4 h-4 text-red-500" /><span className="text-red-500">ระดับน้ำกำลังขึ้น</span></>}
+                    {trend === 'falling' && <><TrendingDown className="w-4 h-4 text-green-500" /><span className="text-green-500">ระดับน้ำกำลังลง</span></>}
+                    {trend === 'stable' && <><Minus className="w-4 h-4 text-gray-400" /><span className="text-gray-400">ระดับน้ำคงที่</span></>}
+                  </div>
+                )}
 
                 <div className="text-xs text-gray-400 flex items-center justify-between pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-1.5">
@@ -597,7 +713,7 @@ function App() {
               <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-sm font-bold text-gray-900">ประวัติการแจ้เตือน</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '300px' }}>
                 <table className="w-full text-sm">
                   <thead className="border-b border-gray-200 bg-gray-50">
                     <tr>
@@ -630,34 +746,63 @@ function App() {
             {/* Alert History Page */}
             {currentPage === 'alerts' && (
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ประวตัิการเเจ้เตือน</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">ประวัติการแจ้งเตือน</h2>
+                  {alertLog.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm('ลบประวัติทั้งหมด?')) {
+                          setAlertLog([])
+                          localStorage.removeItem('alertLog')
+                        }
+                      }}
+                      className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all"
+                    >
+                      ลบทั้งหมด
+                    </button>
+                  )}
+                </div>
                 <div className="rounded-lg border bg-white overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-b border-gray-200 bg-gray-50">
-                        <tr>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานที่</th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">จุดตรวจวัด</th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระดับน้ำ</th>
-                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
-                          <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">วัดต้นสน เพชรบุรี</td>
-                          <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">แม่น้ำ</td>
-                          <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
-                          <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
-                            <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: config.bg, color: config.color }}>
-                              {config.label}
-                            </span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {alertLog.length === 0 ? (
+                    <div className="text-center py-16 text-gray-400">
+                      <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">ยังไม่มีการแจ้งเตือน</p>
+                      <p className="text-xs mt-1">ระบบจะบันทึกทุกครั้งที่สถานะเปลี่ยน</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '520px' }}>
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
+                          <tr>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">วันที่</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระดับน้ำ</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เปลี่ยนจาก</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะใหม่</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {alertLog.map((entry) => {
+                            const prev = STATUS_CONFIG[entry.prevStatus]
+                            const curr = STATUS_CONFIG[entry.status]
+                            return (
+                              <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{entry.date}</td>
+                                <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{entry.time}</td>
+                                <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{entry.distance} ซม.</td>
+                                <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
+                                  <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: prev.bg, color: prev.color }}>{prev.label}</span>
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
+                                  <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: curr.bg, color: curr.color }}>{curr.label}</span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -715,6 +860,51 @@ function App() {
                         {soundOn ? 'เปิด' : 'ปิด'}
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Map Page */}
+            {currentPage === 'map' && (
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">แผนที่จุดตรวจวัด</h2>
+                <div className="rounded-lg border bg-white overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: config.color }} />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">วัดต้นสน เพชรบุรี</p>
+                      <p className="text-xs text-gray-500">ระดับน้ำ: {distance ?? '--'} ซม. · {config.label}</p>
+                    </div>
+                    {rssi !== null && (
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <WifiBars rssi={rssi} />
+                        <span className="text-xs text-gray-400">{rssi} dBm</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ height: '420px' }}>
+                    <MapContainer
+                      center={[13.1106, 99.9398]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[13.1106, 99.9398]}>
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-bold mb-1">วัดต้นสน เพชรบุรี</p>
+                            <p>ระดับน้ำ: <strong>{distance ?? '--'} ซม.</strong></p>
+                            <p>สถานะ: <strong>{config.label}</strong></p>
+                            {rssi !== null && <p>WiFi: {rssi} dBm</p>}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </MapContainer>
                   </div>
                 </div>
               </div>
