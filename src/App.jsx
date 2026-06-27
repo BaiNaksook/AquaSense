@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power } from 'lucide-react'
 import mqtt from 'mqtt'
 
@@ -426,18 +426,40 @@ function App() {
                   </motion.span>
                 </div>
 
-                <div className="mb-4">
-                  <motion.span className="text-5xl sm:text-6xl font-black tracking-tight" style={{ color: config.color }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
-                    {distance ?? '--'}
-                  </motion.span>
-                  <span className="text-sm font-medium text-gray-500 ml-2">ซม.</span>
+                <div className="mb-4 flex items-end gap-2">
+                  <div className="relative overflow-hidden h-[4.5rem] sm:h-[5rem] flex items-center">
+                    <AnimatePresence mode="popLayout">
+                      <motion.span
+                        key={distance}
+                        initial={{ y: 24, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -24, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        className="text-5xl sm:text-6xl font-black tracking-tight"
+                        style={{ color: config.color }}
+                      >
+                        {distance ?? '--'}
+                      </motion.span>
+                    </AnimatePresence>
+                  </div>
+                  <span className="text-sm font-medium text-gray-500 mb-2">ซม.</span>
                 </div>
 
                 <h3 className="text-sm font-bold text-gray-900 mb-1">แม่น้ำ</h3>
                 <p className="text-xs text-gray-500 mb-4">{connected ? config.evacuate : 'รอข้อมูล'}</p>
 
                 <div className="text-xs text-gray-400 flex items-center justify-between pt-4 border-t border-gray-100">
-                  <span>อัปเดตล่าสุด</span>
+                  <div className="flex items-center gap-1.5">
+                    {connected && (
+                      <motion.span
+                        animate={{ scale: [1, 1.6, 1], opacity: [1, 0.4, 1] }}
+                        transition={{ duration: 0.8, repeat: Infinity }}
+                        className="w-1.5 h-1.5 rounded-full inline-block"
+                        style={{ backgroundColor: config.color }}
+                      />
+                    )}
+                    <span>อัปเดตล่าสุด</span>
+                  </div>
                   <span>{lastUpdated}</span>
                 </div>
               </motion.div>
