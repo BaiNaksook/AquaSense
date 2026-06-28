@@ -11,10 +11,6 @@ const MQTT_PASSWORD = 'PsR12345678'
 const MQTT_TOPIC = 'aquasense/sensor/distance'
 const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
-const SUPABASE_FUNCTIONS_URL = 'https://evwfgksoitfjdigrvdbd.supabase.co/functions/v1/send-push'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-
 // ===== Status Logic =====
 function getWaterStatus(distance) {
   if (distance < 10) return 'critical'
@@ -68,8 +64,20 @@ function useAlertSound() {
 
   const play = useCallback((type) => {
     try {
-      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!ctxRef.current) {
+        // Do not create AudioContext before any user interaction.
+        if (!navigator.userActivation?.hasBeenActive) return
+        ctxRef.current = new AudioCtx()
+      }
       const ctx = ctxRef.current
+      if (ctx.state === 'suspended') {
+        if (navigator.userActivation?.isActive) {
+          void ctx.resume().catch(() => {})
+        }
+        if (ctx.state !== 'running') return
+      }
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain)
@@ -110,8 +118,20 @@ function useClickSound() {
   const ctxRef = useRef(null)
   return useCallback((type = 'default') => {
     try {
-      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!ctxRef.current) {
+        // Skip hover sound until audio is unlocked by a real user gesture.
+        if (!navigator.userActivation?.hasBeenActive) return
+        ctxRef.current = new AudioCtx()
+      }
       const ctx = ctxRef.current
+      if (ctx.state === 'suspended') {
+        if (navigator.userActivation?.isActive) {
+          void ctx.resume().catch(() => {})
+        }
+        if (ctx.state !== 'running') return
+      }
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain)
@@ -146,14 +166,6 @@ function useClickSound() {
       }
     } catch { return }
   }, [])
-}
-
-// ===== VAPID helper =====
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = atob(base64)
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
 
 // ===== WiFi Bars =====
@@ -225,7 +237,6 @@ function App() {
   const [sensorOn, setSensorOn] = useState(true)
   const [rssi, setRssi] = useState(null)
   const [installPrompt, setInstallPrompt] = useState(null)
-  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('notifEnabled') === '1')
   const [alertLog, setAlertLog] = useState(() => {
     try { return JSON.parse(localStorage.getItem('alertLog') || '[]') } catch { return [] }
   })
@@ -236,50 +247,6 @@ function App() {
   const lastDbSaveRef = useRef(null)
   const playSound = useAlertSound()
   const playClick = useClickSound()
-
-  // ===== Push subscribe =====
-  const subscribePush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('บราว์เซอร์นี้ไม่รองรับ Push Notification')
-      return
-    }
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') return
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const existing = await reg.pushManager.getSubscription()
-      const sub = existing ?? await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      })
-      const { endpoint, keys } = sub.toJSON()
-      if (supabase) {
-        await supabase.from('push_subscriptions').upsert(
-          { endpoint, p256dh: keys.p256dh, auth: keys.auth },
-          { onConflict: 'endpoint' },
-        )
-      }
-      setNotifEnabled(true)
-      localStorage.setItem('notifEnabled', '1')
-    } catch (err) {
-      console.warn('Push subscribe error:', err)
-    }
-  }
-
-  const unsubscribePush = async () => {
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        if (supabase) await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
-        await sub.unsubscribe()
-      }
-      setNotifEnabled(false)
-      localStorage.removeItem('notifEnabled')
-    } catch (err) {
-      console.warn('Push unsubscribe error:', err)
-    }
-  }
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
@@ -428,17 +395,6 @@ function App() {
           location: 'วัดต้นสน เพชรบุรี',
         }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       }
-      // Send push notification
-      const cfg = STATUS_CONFIG[status]
-      fetch(SUPABASE_FUNCTIONS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          title: `⚠️ AquaSense — ${cfg.label}`,
-          body: `ระดับน้ำ: ${distance} ซม. · ${cfg.evacuate}`,
-          status,
-        }),
-      }).catch(() => {})
       prevStatusRef.current = status
     }
   }, [status, distance])
@@ -651,18 +607,6 @@ function App() {
                 <span className="hidden sm:inline text-xs font-medium">ติดตั้งแอป</span>
               </motion.button>
             )}
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseEnter={() => playClick('hover')}
-              onClick={() => { playClick(notifEnabled ? 'toggle-off' : 'toggle-on'); notifEnabled ? unsubscribePush() : subscribePush() }}
-              className={`flex items-center gap-1.5 transition-all px-2 sm:px-3 py-1.5 rounded-lg ${notifEnabled ? 'text-purple-600 hover:bg-purple-50' : 'text-gray-400 hover:bg-gray-100'}`}
-              title={notifEnabled ? 'ปิดการแจ้งเตือน' : 'เปิดการแจ้งเตือน'}
-            >
-              <Bell className="w-4 h-4" />
-              <span className="hidden sm:inline text-xs font-medium">{notifEnabled ? 'แจ้งเตือน On' : 'แจ้งเตือน'}</span>
-            </motion.button>
           </div>
         </div>
 

@@ -1,3 +1,5 @@
+// This file runs in Supabase Edge Runtime (Deno), not in the Vite/Node TypeScript context.
+// @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!
