@@ -316,7 +316,7 @@ function App() {
 
         // ===== Save to Supabase (throttle: ทุก 10 วิ) =====
         const now = Date.now()
-        if (!lastDbSaveRef.current || now - lastDbSaveRef.current >= 10000) {
+        if (supabase && (!lastDbSaveRef.current || now - lastDbSaveRef.current >= 10000)) {
           lastDbSaveRef.current = now
           supabase.from('water_readings').insert({
             distance: rounded,
@@ -356,12 +356,14 @@ function App() {
         return updated
       })
       // Save alert to Supabase
-      supabase.from('alert_history').insert({
-        distance,
-        status,
-        prev_status: prevStatusRef.current,
-        location: 'วัดต้นสน เพชรบุรี',
-      }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
+      if (supabase) {
+        supabase.from('alert_history').insert({
+          distance,
+          status,
+          prev_status: prevStatusRef.current,
+          location: 'วัดต้นสน เพชรบุรี',
+        }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
+      }
       prevStatusRef.current = status
     }
   }, [status, distance])
