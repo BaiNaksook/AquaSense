@@ -237,6 +237,7 @@ function App() {
   const [sensorOn, setSensorOn] = useState(true)
   const [rssi, setRssi] = useState(null)
   const [installPrompt, setInstallPrompt] = useState(null)
+  const [audioUnlockTick, setAudioUnlockTick] = useState(0)
   const [alertLog, setAlertLog] = useState(() => {
     try { return JSON.parse(localStorage.getItem('alertLog') || '[]') } catch { return [] }
   })
@@ -275,6 +276,27 @@ function App() {
   const config = STATUS_CONFIG[status]
   const isAlert = status === 'danger' || status === 'critical'
 
+  // Browser audio is blocked until the first real user gesture.
+  // If the page opens directly into an alert state, retry the alert sound as soon as audio is unlocked.
+  useEffect(() => {
+    const unlockAudio = () => {
+      setAudioUnlockTick((tick) => tick + 1)
+      if (isAlert && soundOn && connected) {
+        playSound(status)
+      }
+    }
+
+    window.addEventListener('pointerdown', unlockAudio, { once: true })
+    window.addEventListener('keydown', unlockAudio, { once: true })
+    window.addEventListener('touchstart', unlockAudio, { once: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
+    }
+  }, [isAlert, soundOn, connected, status, playSound])
+
   // Continuous beeping while in danger/critical
   useEffect(() => {
     if (alertIntervalRef.current) {
@@ -295,7 +317,7 @@ function App() {
         clearInterval(alertIntervalRef.current)
       }
     }
-  }, [status, isAlert, soundOn, connected, playSound])
+  }, [status, isAlert, soundOn, connected, audioUnlockTick, playSound])
 
   // ===== MQTT =====
   useEffect(() => {
