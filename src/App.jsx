@@ -1,18 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus, MapPin } from 'lucide-react'
+import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import mqtt from 'mqtt'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
-
-// Fix leaflet default icon
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
+import { supabase } from './supabase'
 
 // ===== MQTT Config =====
 const MQTT_URL = 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884/mqtt'
@@ -229,6 +219,7 @@ function App() {
 
   const alertIntervalRef = useRef(null)
   const mqttClientRef = useRef(null)
+  const lastDbSaveRef = useRef(null)
   const playSound = useAlertSound()
   const playClick = useClickSound()
 
@@ -322,6 +313,18 @@ function App() {
           })
         )
         setHistory((prev) => [...prev.slice(-29), rounded])
+
+        // ===== Save to Supabase (throttle: ทุก 10 วิ) =====
+        const now = Date.now()
+        if (!lastDbSaveRef.current || now - lastDbSaveRef.current >= 10000) {
+          lastDbSaveRef.current = now
+          supabase.from('water_readings').insert({
+            distance: rounded,
+            status: getWaterStatus(rounded),
+            rssi: incomingRssi ?? null,
+            location: 'วัดต้นสน เพชรบุรี',
+          }).then(({ error }) => { if (error) console.warn('Supabase insert error:', error.message) })
+        }
       }
     })
 
@@ -352,6 +355,13 @@ function App() {
         localStorage.setItem('alertLog', JSON.stringify(updated))
         return updated
       })
+      // Save alert to Supabase
+      supabase.from('alert_history').insert({
+        distance,
+        status,
+        prev_status: prevStatusRef.current,
+        location: 'วัดต้นสน เพชรบุรี',
+      }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       prevStatusRef.current = status
     }
   }, [status, distance])
@@ -458,17 +468,6 @@ function App() {
           >
             <Settings className="w-4 h-4" />
             <span className="text-sm">ตั้งค่า</span>
-          </motion.button>
-          <motion.button
-            whileHover={{ x: 4 }}
-            onMouseEnter={() => playClick('hover')}
-            onClick={() => handlePageChange('map')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
-              currentPage === 'map' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <MapPin className="w-4 h-4" />
-            <span className="text-sm">แผนที่จุดตรวจวัด</span>
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
@@ -913,51 +912,6 @@ function App() {
                         {soundOn ? 'เปิด' : 'ปิด'}
                       </button>
                     </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Map Page */}
-            {currentPage === 'map' && (
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">แผนที่จุดตรวจวัด</h2>
-                <div className="rounded-lg border bg-white overflow-hidden">
-                  <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: config.color }} />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">วัดต้นสน เพชรบุรี</p>
-                      <p className="text-xs text-gray-500">ระดับน้ำ: {distance ?? '--'} ซม. · {config.label}</p>
-                    </div>
-                    {rssi !== null && (
-                      <div className="ml-auto flex items-center gap-1.5">
-                        <WifiBars rssi={rssi} />
-                        <span className="text-xs text-gray-400">{rssi} dBm</span>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ height: '420px' }}>
-                    <MapContainer
-                      center={[13.1106, 99.9398]}
-                      zoom={15}
-                      style={{ height: '100%', width: '100%' }}
-                      scrollWheelZoom
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <Marker position={[13.1106, 99.9398]}>
-                        <Popup>
-                          <div className="text-sm">
-                            <p className="font-bold mb-1">วัดต้นสน เพชรบุรี</p>
-                            <p>ระดับน้ำ: <strong>{distance ?? '--'} ซม.</strong></p>
-                            <p>สถานะ: <strong>{config.label}</strong></p>
-                            {rssi !== null && <p>WiFi: {rssi} dBm</p>}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    </MapContainer>
                   </div>
                 </div>
               </div>
