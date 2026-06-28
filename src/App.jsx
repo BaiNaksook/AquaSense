@@ -212,6 +212,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sensorOn, setSensorOn] = useState(true)
   const [rssi, setRssi] = useState(null)
+  const [installPrompt, setInstallPrompt] = useState(null)
   const [alertLog, setAlertLog] = useState(() => {
     try { return JSON.parse(localStorage.getItem('alertLog') || '[]') } catch { return [] }
   })
@@ -222,6 +223,12 @@ function App() {
   const lastDbSaveRef = useRef(null)
   const playSound = useAlertSound()
   const playClick = useClickSound()
+
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -558,6 +565,24 @@ function App() {
               <Radio className="w-4 h-4" strokeWidth={soundOn ? 2.5 : 2} />
               <span className="hidden sm:inline text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
             </motion.button>
+
+            {installPrompt && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onMouseEnter={() => playClick('hover')}
+                onClick={() => {
+                  playClick('toggle-on')
+                  installPrompt.prompt()
+                  installPrompt.userChoice.then(() => setInstallPrompt(null))
+                }}
+                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-blue-50"
+                title="ติดตั้งแอป"
+              >
+                <Zap className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs font-medium">ติดตั้งแอป</span>
+              </motion.button>
+            )}
           </div>
         </div>
 
