@@ -12,9 +12,9 @@ const MQTT_TOPIC = 'aquasense/sensor/distance'
 const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 
 // ===== Status Logic =====
-// เกณฑ์ตรงกับ Arduino: > 80 เขียว, 60–80 เหลือง, <= 60 แดง
-const DIST_SAFE = 80
-const DIST_WARN = 60
+// เกณฑ์ตรงกับ Arduino: > 60 เขียว, 40–60 เหลือง, <= 40 แดง
+const DIST_SAFE = 60
+const DIST_WARN = 40
 
 function getWaterStatus(distance) {
   if (distance > DIST_SAFE) return 'safe'
@@ -813,9 +813,9 @@ function App() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 80 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="60–80 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 60 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 60 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="40–60 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 40 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
               </div>
             </div>
 
