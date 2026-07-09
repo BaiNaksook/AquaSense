@@ -1,7 +1,7 @@
 /* global clients */
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? {}
-  const title = data.title ?? 'AquaSense'
+  const title = data.title ?? 'COAST GUARD AI'
   const body = data.body ?? 'มีการแจ้งเตือนใหม่'
   const status = data.status ?? 'safe'
 
