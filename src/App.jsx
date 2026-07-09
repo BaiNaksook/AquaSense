@@ -12,11 +12,14 @@ const MQTT_TOPIC = 'aquasense/sensor/distance'
 const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 
 // ===== Status Logic =====
+// เกณฑ์ตรงกับ Arduino: > 80 เขียว, 60–80 เหลือง, <= 60 แดง
+const DIST_SAFE = 80
+const DIST_WARN = 60
+
 function getWaterStatus(distance) {
-  if (distance < 10) return 'critical'
-  if (distance < 30) return 'danger'
-  if (distance < 60) return 'warning'
-  return 'safe'
+  if (distance > DIST_SAFE) return 'safe'
+  if (distance > DIST_WARN) return 'warning'
+  return 'danger'
 }
 
 const STATUS_CONFIG = {
@@ -40,15 +43,6 @@ const STATUS_CONFIG = {
   },
   danger: {
     label: 'อันตราย',
-    color: '#f97316',
-    bg: 'rgba(249,115,22,0.06)',
-    border: 'rgba(249,115,22,0.2)',
-    evacuate: 'เตรียมพร้อมอพยพ',
-    evacuateSub: 'น้ำสูง ควรเตรียมตัว',
-    shouldEvacuate: true,
-  },
-  critical: {
-    label: 'อันตรายสูงสุด',
     color: '#ef4444',
     bg: 'rgba(239,68,68,0.08)',
     border: 'rgba(239,68,68,0.25)',
@@ -83,7 +77,8 @@ function useAlertSound() {
       osc.connect(gain)
       gain.connect(ctx.destination)
 
-      if (type === 'critical') {
+      if (type === 'danger') {
+        // โทนสลับสูง-ต่ำ ให้เข้าคู่กับ buzzer ฝั่ง Arduino (1500/600 Hz)
         osc.frequency.setValueAtTime(880, ctx.currentTime)
         osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12)
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.24)
@@ -91,13 +86,6 @@ function useAlertSound() {
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
         osc.start(ctx.currentTime)
         osc.stop(ctx.currentTime + 0.4)
-      } else if (type === 'danger') {
-        osc.frequency.setValueAtTime(660, ctx.currentTime)
-        osc.frequency.setValueAtTime(520, ctx.currentTime + 0.15)
-        gain.gain.setValueAtTime(0.18, ctx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35)
-        osc.start(ctx.currentTime)
-        osc.stop(ctx.currentTime + 0.35)
       } else if (type === 'warning') {
         osc.frequency.setValueAtTime(440, ctx.currentTime)
         gain.gain.setValueAtTime(0.1, ctx.currentTime)
@@ -274,7 +262,7 @@ function App() {
 
   const status = distance !== null ? getWaterStatus(distance) : 'safe'
   const config = STATUS_CONFIG[status]
-  const isAlert = status === 'danger' || status === 'critical'
+  const isAlert = status === 'danger'
 
   // Browser audio is blocked until the first real user gesture.
   // If the page opens directly into an alert state, retry the alert sound as soon as audio is unlocked.
@@ -297,7 +285,7 @@ function App() {
     }
   }, [isAlert, soundOn, connected, status, playSound])
 
-  // Continuous beeping while in danger/critical
+  // Continuous beeping while in danger
   useEffect(() => {
     if (alertIntervalRef.current) {
       clearInterval(alertIntervalRef.current)
@@ -306,10 +294,9 @@ function App() {
 
     if (isAlert && soundOn && connected) {
       playSound(status)
-      const interval = status === 'critical' ? 6000 : 8000
       alertIntervalRef.current = setInterval(() => {
         playSound(status)
-      }, interval)
+      }, 6000)
     }
 
     return () => {
@@ -825,11 +812,10 @@ function App() {
             {/* Status Cards */}
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 60 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="30–60 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="10–30 ซม." desc="เตรียมอพยพ" color="#f97316" isActive={status === 'danger' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตรายสูงสุด" range="< 10 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'critical' && connected} theme={theme} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 80 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="60–80 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 60 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
               </div>
             </div>
 
