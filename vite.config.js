@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-icon.svg'],
       manifest: {
-        name: 'AquaSense — ระบบตรวจวัดระดับน้ำ',
-        short_name: 'AquaSense',
+        name: 'COAST GUARD AI — ระบบตรวจวัดระดับน้ำ',
+        short_name: 'COAST GUARD AI',
         description: 'ระบบตรวจวัดและแจ้งเตือนระดับน้ำอัจฉริยะ',
         theme_color: '#3b82f6',
         background_color: '#f9fafb',

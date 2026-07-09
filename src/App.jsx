@@ -473,7 +473,7 @@ function App() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
               <Droplets className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-gray-900">AquaSense</span>
+            <span className="font-bold text-gray-900">COAST GUARD AI</span>
           </div>
         </div>
 
@@ -535,7 +535,7 @@ function App() {
         </div>
 
         <div className="p-4 border-t border-gray-200 text-xs text-gray-400 text-center">
-          PSR AquaSense © 2026
+          PSR COAST GUARD AI © 2026
         </div>
       </div>
 
@@ -982,7 +982,7 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">เกี่ยวกับระบบ</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6 space-y-4">
                   <div>
-                    <p className="font-medium text-gray-900">AquaSense</p>
+                    <p className="font-medium text-gray-900">COAST GUARD AI</p>
                     <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
                   </div>
                   <div className="pt-4 border-t border-gray-200">
@@ -993,7 +993,7 @@ function App() {
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-xs text-gray-500">เวอร์ชัน 1.0.0</p>
-                    <p className="text-xs text-gray-500 mt-1">PSR AquaSense © 2026</p>
+                    <p className="text-xs text-gray-500 mt-1">PSR COAST GUARD AI © 2026</p>
                   </div>
                 </div>
               </div>
