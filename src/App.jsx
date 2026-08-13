@@ -683,7 +683,7 @@ function App() {
                 <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือ ณ ที่หนึ่ง · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
-              <motion.div layout className="water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ '--status': config.color, borderColor: config.border }}>
+              <motion.div layout className={`water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6${isAlert && connected ? ' is-alert' : ''}`} style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
@@ -703,7 +703,7 @@ function App() {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -28, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="text-6xl sm:text-7xl font-black tabular-nums leading-none"
+                        className="reading-value text-6xl sm:text-7xl font-black tabular-nums leading-none"
                         style={{ color: config.color, letterSpacing: '-0.045em' }}
                       >
                         {distance ?? '--'}
@@ -778,6 +778,12 @@ function App() {
                     <svg
                       viewBox="0 0 500 280"
                       className="w-full cursor-crosshair"
+                      role="img"
+                      aria-label={
+                        history.length < 2
+                          ? 'กราฟระดับน้ำ ยังไม่มีข้อมูลเพียงพอ'
+                          : `กราฟระดับน้ำย้อนหลัง ${history.length} ค่า ค่าล่าสุด ${distance} เซนติเมตร สถานะ ${config.label}`
+                      }
                       onMouseMove={(e) => {
                         const svg = e.currentTarget
                         const rect = svg.getBoundingClientRect()
@@ -810,14 +816,14 @@ function App() {
 
                       {/* Grid lines */}
                       {[0, 1, 2, 3, 4].map((i) => (
-                        <line key={i} x1="50" y1={240 - i * 50} x2="480" y2={240 - i * 50} stroke="#e5e7eb" strokeWidth="1" />
+                        <line key={i} className="chart-grid" x1="50" y1={240 - i * 50} x2="480" y2={240 - i * 50} strokeWidth="1" />
                       ))}
 
                       {/* Y-axis labels */}
                       {[0, 1, 2, 3, 4].map((i) => {
                         const value = Math.round((chartMaxValue / 4) * i)
                         return (
-                          <text key={i} x="30" y={245 - i * 50} fontSize="12" fill="#9ca3af" textAnchor="end">
+                          <text key={i} className="chart-axis" x="30" y={245 - i * 50} fontSize="11" textAnchor="end">
                             {value}
                           </text>
                         )
@@ -832,8 +838,8 @@ function App() {
                           />
                           <polyline
                             points={sparklinePoints.map((p) => `${p.x * 4.3 + 50},${240 - p.y}`).join(' ')}
+                            className="chart-line"
                             fill="none"
-                            stroke="#3b82f6"
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -843,9 +849,8 @@ function App() {
                             <circle
                               cx={sparklinePoints[sparklinePoints.length - 1].x * 4.3 + 50}
                               cy={240 - sparklinePoints[sparklinePoints.length - 1].y}
+                              className="chart-dot"
                               r="4"
-                              fill="#3b82f6"
-                              stroke="white"
                               strokeWidth="2"
                             />
                           )}

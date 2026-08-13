@@ -25,6 +25,9 @@
 
   --radius: 18px;
   --radius-sm: 12px;
+
+  /* ฟอนต์ตัวเลข: monospace ทำให้ค่าที่วัดได้ดูเป็นเครื่องมือวัด และหลักไม่ขยับตอนเลขเปลี่ยน */
+  --font-mono: 'Fira Code', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
 
 html.dark {
@@ -53,6 +56,7 @@ html.dark {
 body {
   margin: 0;
   font-family: Inter, 'Noto Sans Thai', 'Leelawadee UI', sans-serif;
+  font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--fg);
@@ -224,6 +228,22 @@ nav .bg-blue-50::before {
     color-mix(in srgb, var(--status) 35%, transparent));
 }
 
+/* โหมดอันตราย: แสงเรืองเต้นเป็นจังหวะ ดึงสายตาโดยไม่ต้องกระพริบให้แสบตา */
+.water-hero.is-alert { animation: alert-glow 2.2s ease-in-out infinite; }
+@keyframes alert-glow {
+  0%, 100% {
+    box-shadow:
+      0 28px 64px -28px color-mix(in srgb, var(--status) 42%, transparent),
+      var(--shadow-md);
+  }
+  50% {
+    box-shadow:
+      0 30px 78px -26px color-mix(in srgb, var(--status) 72%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--status) 32%, transparent),
+      var(--shadow-md);
+  }
+}
+
 /* หลอดวัดระดับน้ำ */
 .gauge-layout {
   display: grid;
@@ -364,6 +384,21 @@ tbody tr:hover { background: color-mix(in srgb, var(--primary) 5%, transparent);
    Utilities
    ============================================================ */
 .font-extrabold, .font-black, .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* monospace ใช้เฉพาะจุดที่เป็นตัวเลขล้วน (แกนกราฟ) เท่านั้น
+   ถ้าเอาไปใช้กับข้อความที่ปนภาษาไทย ตัวอักษรไทยจะถ่างผิดรูป
+   ส่วนตัวเลขใหญ่บนการ์ดหลักคงไว้ที่ Inter เพราะ monospace ที่ 60px+ ล้นกรอบ */
+.mono-num {
+  font-family: var(--font-mono);
+  font-feature-settings: 'calt' 0;   /* ปิด ligature ของ Fira Code */
+  letter-spacing: -.01em;
+}
+
+/* กราฟ — ใช้สีจากระบบตัวแปร เพื่อให้ธีมมืดถูกต้องและเส้นตารางไม่แย่งสายตา */
+.chart-grid { stroke: var(--border); }
+.chart-axis { fill: var(--muted); font-family: var(--font-mono); }
+.chart-line { stroke: var(--primary); }
+.chart-dot { fill: var(--primary); stroke: var(--surface); }
 
 @keyframes subtle-pulse {
   0%, 100% { opacity: 1; }
