@@ -11,6 +11,10 @@ const MQTT_PASSWORD = 'PsR12345678'
 const MQTT_TOPIC = 'aquasense/sensor/distance'
 const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 
+// Arduino ส่งค่าทุก 2 วิ — เงียบเกิน 20 วิ ถือว่าขาดการเชื่อมต่อ
+// (ระบบเตือนภัยห้ามโชว์เลขเก่าค้างไว้เหมือนทุกอย่างปกติ)
+const STALE_MS = 20000
+
 // ===== Status Logic =====
 // เกณฑ์ตรงกับ Arduino: >= 30 เขียว, 21–30 เหลือง, < 21 แดง
 const GREEN_MIN = 30
@@ -213,7 +217,12 @@ function App() {
     return 'light'
   })
   const [distance, setDistance] = useState(null)
-  const [connected, setConnected] = useState(false)
+  const [hasData, setHasData] = useState(false)
+  const [isStale, setIsStale] = useState(false)
+  const [staleSec, setStaleSec] = useState(0)
+  const [waterDepth, setWaterDepth] = useState(null)
+  const [riseRate, setRiseRate] = useState(0)
+  const [rapidRise, setRapidRise] = useState(false)
   const [mqttStatus, setMqttStatus] = useState('connecting')
   const [lastUpdated, setLastUpdated] = useState('')
   const [soundOn, setSoundOn] = useState(true)
@@ -234,6 +243,7 @@ function App() {
   const alertIntervalRef = useRef(null)
   const mqttClientRef = useRef(null)
   const lastDbSaveRef = useRef(null)
+  const lastDataAtRef = useRef(null)
   const playSound = useAlertSound()
   const playClick = useClickSound()
 
@@ -259,6 +269,25 @@ function App() {
       document.body.style.overflow = ''
     }
   }, [sidebarOpen])
+
+  // นับเวลาตั้งแต่ได้ข้อมูลล่าสุด — เงียบนานเกินไปคือขาดการเชื่อมต่อ
+  useEffect(() => {
+    const id = setInterval(() => {
+      const t = lastDataAtRef.current
+      if (t === null) return
+      const age = Date.now() - t
+      if (age > STALE_MS) {
+        setStaleSec(Math.floor(age / 1000))
+        setIsStale(true)
+      } else {
+        setIsStale(false)
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ข้อมูลค้างถือว่า "ไม่เชื่อมต่อ" ทั้งหน้าเว็บ — สถานะ ไฟ และเสียงเตือนหยุดตามกันหมด
+  const connected = hasData && !isStale
 
   const status = distance !== null ? getWaterStatus(distance) : 'safe'
   const config = STATUS_CONFIG[status]
@@ -331,21 +360,33 @@ function App() {
 
     client.on('message', (_topic, message) => {
       const payload = message.toString().trim()
-      const { d, rssi: incomingRssi } = (() => {
+      const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null)
+      const { d, rssi: incomingRssi, water, rise, rapid } = (() => {
         try {
           const obj = JSON.parse(payload)
           if (obj !== null && typeof obj === 'object' && typeof obj.distance === 'number') {
-            return { d: obj.distance, rssi: typeof obj.rssi === 'number' ? obj.rssi : null }
+            return {
+              d: obj.distance,
+              rssi: num(obj.rssi),
+              water: num(obj.water),          // ระดับน้ำจริง (ถ้า Arduino ตั้ง HEIGHT ไว้)
+              rise: num(obj.rise),            // อัตราน้ำขึ้น ซม./นาที
+              rapid: obj.rapid === 1 || obj.rapid === true,
+            }
           }
         } catch { /* plain number */ }
-        return { d: parseFloat(payload), rssi: null }
+        return { d: parseFloat(payload), rssi: null, water: null, rise: null, rapid: false }
       })()
       if (incomingRssi !== null) setRssi(incomingRssi)
       if (!isNaN(d) && d >= 0) {
         // เก็บทศนิยม 1 ตำแหน่ง — เกณฑ์สีละเอียดระดับ 0.5 ซม. ปัดเป็นจำนวนเต็มไม่ได้
         const rounded = Math.round(d * 10) / 10
         setDistance(rounded)
-        setConnected(true)
+        setHasData(true)
+        setIsStale(false)
+        lastDataAtRef.current = Date.now()
+        setWaterDepth(water === null ? null : Math.round(water * 10) / 10)
+        setRiseRate(rise === null ? 0 : Math.round(rise * 10) / 10)
+        setRapidRise(rapid)
         setLastUpdated(
           new Date().toLocaleTimeString('th-TH', {
             hour: '2-digit',
@@ -453,28 +494,29 @@ function App() {
   })()
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell flex min-h-screen bg-gray-50">
       {sidebarOpen && (
         <button
           type="button"
           aria-label="ปิดเมนู"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          className="drawer-overlay fixed inset-0 z-30 bg-black/40 lg:hidden"
         />
       )}
 
       {/* ===== Sidebar ===== */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-full sm:w-72 max-w-full bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:static lg:w-64 lg:translate-x-0 ${
+        className={`app-sidebar fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[280px] bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-300 lg:static lg:w-[248px] lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="brand-mark w-9 h-9 rounded-lg flex items-center justify-center">
               <Droplets className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-gray-900">COAST GUARD AI</span>
+            <div><span className="block font-bold text-gray-900">AquaSense</span><span className="block text-[10px] text-gray-500 tracking-[.14em]">COASTAL MONITOR</span></div>
+            <button type="button" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} className="sidebar-close ml-auto lg:hidden"><span aria-hidden="true">×</span></button>
           </div>
         </div>
 
@@ -525,14 +567,12 @@ function App() {
           </motion.button>
         </nav>
 
-        {/* Water illustration */}
+        {/* Compact live status module */}
         <div className="p-4 border-t border-gray-200">
-          <div className="bg-gradient-to-b from-blue-400 to-blue-200 rounded-lg h-20 flex items-end justify-center overflow-hidden relative">
-            <svg viewBox="0 0 200 60" className="w-full h-full" preserveAspectRatio="none">
-              <path d="M0,40 Q50,30 100,40 T200,40 L200,60 L0,60 Z" fill="rgba(255,255,255,0.3)" />
-            </svg>
+          <div className="sidebar-status">
+            <div className="sidebar-level"><span style={{ height: `${distance === null ? 32 : Math.max(12, Math.min(88, 100 - distance / 2))}%`, backgroundColor: config.color }} /></div>
+            <div><p className="text-[11px] text-gray-500">สถานีวัดต้นสน</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
         </div>
 
         <div className="p-4 border-t border-gray-200 text-xs text-gray-400 text-center">
@@ -543,7 +583,7 @@ function App() {
       {/* ===== Main Content ===== */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2">
+        <header className="topbar bg-white border-b border-gray-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -554,7 +594,7 @@ function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2">
+            <div className="connection-chip flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 {mqttStatus === 'connected' && (
                   <motion.span animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 2, repeat: Infinity }} className="absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: mqttColor }} />
@@ -618,17 +658,38 @@ function App() {
               </motion.button>
             )}
           </div>
-        </div>
+        </header>
 
         {/* Content Scroll */}
         <div className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-8">
+          <main className="page-content p-4 sm:p-8">
+            {/* ข้อมูลขาดช่วง = อันตรายเงียบ ต้องเตือนชัด ไม่ปล่อยให้เลขเก่าหลอกตา */}
+            <AnimatePresence>
+              {isStale && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="mb-4 sm:mb-6 rounded-lg border px-4 py-3 flex items-center gap-3"
+                  style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.3)' }}
+                >
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: '#ef4444' }}>ขาดการเชื่อมต่อเซ็นเซอร์</p>
+                    <p className="text-xs text-gray-600">
+                      ไม่ได้รับข้อมูลมา {staleSec} วินาที · ตัวเลขที่เห็นเป็นค่าล่าสุด ไม่ใช่ค่าปัจจุบัน
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
+                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำ</p><h1>ภาพรวมสถานี</h1><p>วัดต้นสน · เพชรบุรี · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
-              <motion.div layout className="lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ borderColor: config.border, boxShadow: `0 0 20px ${config.bg}` }}>
+              <motion.div layout className="water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
@@ -639,7 +700,7 @@ function App() {
                   </motion.span>
                 </div>
 
-                <div className="mb-4 flex items-end gap-2">
+                <div className="gauge-layout"><div className="water-gauge" aria-hidden="true"><motion.span animate={{ height: `${distance === null ? 18 : Math.max(8, Math.min(94, 100 - distance / 2))}%` }} transition={{ duration: .7 }} style={{ backgroundColor: config.color }}><i /></motion.span></div><div><p className="reading-label">ระยะจากเซ็นเซอร์ถึงผิวน้ำ</p><div className="mb-4 flex items-end gap-2">
                   <div className="relative overflow-hidden h-[4.5rem] sm:h-[5rem] flex items-center">
                     <AnimatePresence mode="popLayout">
                       <motion.span
@@ -656,7 +717,25 @@ function App() {
                     </AnimatePresence>
                   </div>
                   <span className="text-sm font-medium text-gray-500 mb-2">ซม.</span>
-                </div>
+                </div></div></div>
+
+                {/* ระดับน้ำจริง — มีเมื่อ Arduino ตั้งความสูงเซ็นเซอร์ไว้ (SET HEIGHT) */}
+                {waterDepth !== null && connected && (
+                  <p className="text-xs text-gray-500 mb-3">
+                    ระดับน้ำลึก <span className="text-base font-bold text-gray-900">{waterDepth}</span> ซม.
+                  </p>
+                )}
+
+                {/* น้ำขึ้นเร็วผิดปกติ — เตือนก่อนถึงเส้นอันตราย */}
+                {rapidRise && connected && (
+                  <div
+                    className="flex items-center gap-1.5 mb-3 text-xs font-bold px-2 py-1.5 rounded"
+                    style={{ backgroundColor: 'rgba(249,115,22,0.1)', color: '#f97316' }}
+                  >
+                    <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                    <span>น้ำขึ้นเร็วผิดปกติ {riseRate} ซม./นาที</span>
+                  </div>
+                )}
 
                 <h3 className="text-sm font-bold text-gray-900 mb-1">แม่น้ำ</h3>
                 <p className="text-xs text-gray-500 mb-4">{connected ? config.evacuate : 'รอข้อมูล'}</p>
@@ -695,13 +774,13 @@ function App() {
               </motion.div>
 
               {/* Chart Card */}
-              {history.length > 1 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-2 rounded-lg border bg-white p-4 sm:p-6">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="chart-card lg:col-span-2 rounded-lg border bg-white p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-sm font-bold text-gray-900">กราฟระดับน้ำ(24 ชม.)</h3>
                   </div>
 
                   <div className="relative">
+                    {history.length < 2 && <div className="chart-empty"><TrendingUp className="w-6 h-6"/><strong>กำลังรวบรวมข้อมูลแนวโน้ม</strong><span>กราฟจะแสดงเมื่อได้รับข้อมูลอย่างน้อย 2 ค่า</span></div>}
                     <svg
                       viewBox="0 0 500 280"
                       className="w-full cursor-crosshair"
@@ -807,7 +886,6 @@ function App() {
                     )}
                   </div>
                 </motion.div>
-              )}
             </div>
 
             {/* Status Cards */}
@@ -999,7 +1077,7 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
+          </main>
         </div>
       </div>
     </div>
