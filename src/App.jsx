@@ -16,14 +16,15 @@ const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 const STALE_MS = 20000
 
 // ===== Status Logic =====
-// เกณฑ์ตรงกับ Arduino: >= 30 เขียว, 21–30 เหลือง, < 21 แดง
-const GREEN_MIN = 30
-const YELLOW_MIN = 21
+// เกณฑ์ตรงกับ ESP32 (esp-prs.ino): <= 10 แดง, <= 25 เหลือง, > 25 เขียว
+// ระยะน้อย = น้ำสูง เพราะวัดจากเซ็นเซอร์ลงมาถึงผิวน้ำ
+const RED_MAX = 10
+const YELLOW_MAX = 25
 
 function getWaterStatus(distance) {
-  if (distance >= GREEN_MIN) return 'safe'
-  if (distance >= YELLOW_MIN) return 'warning'
-  return 'danger'
+  if (distance <= RED_MAX) return 'danger'
+  if (distance <= YELLOW_MAX) return 'warning'
+  return 'safe'
 }
 
 const STATUS_CONFIG = {
@@ -32,8 +33,8 @@ const STATUS_CONFIG = {
     color: '#22c55e',
     bg: 'rgba(34,197,94,0.06)',
     border: 'rgba(34,197,94,0.15)',
-    evacuate: 'ไม่จำเป็นต้องอพยพ',
-    evacuateSub: 'ระดับน้ำปกติ',
+    evacuate: 'ระดับน้ำปกติ ดำเนินการได้ตามแผน',
+    evacuateSub: 'พร้อมใช้งาน',
     shouldEvacuate: false,
   },
   warning: {
@@ -50,7 +51,7 @@ const STATUS_CONFIG = {
     color: '#ef4444',
     bg: 'rgba(239,68,68,0.08)',
     border: 'rgba(239,68,68,0.25)',
-    evacuate: 'ควรอพยพทันที',
+    evacuate: 'ควรระบายน้ำออกทันที',
     evacuateSub: 'น้ำสูงมาก เร่งด่วน!',
     shouldEvacuate: true,
   },
@@ -404,7 +405,7 @@ function App() {
             distance: rounded,
             status: getWaterStatus(rounded),
             rssi: incomingRssi ?? null,
-            location: 'วัดต้นสน เพชรบุรี',
+            location: 'นาเกลือแปลงที่หนึ่ง',
           }).then(({ error }) => { if (error) console.warn('Supabase insert error:', error.message) })
         }
       }
@@ -443,7 +444,7 @@ function App() {
           distance,
           status,
           prev_status: prevStatusRef.current,
-          location: 'วัดต้นสน เพชรบุรี',
+          location: 'นาเกลือแปลงที่หนึ่ง',
         }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       }
       prevStatusRef.current = status
@@ -571,7 +572,7 @@ function App() {
         <div className="p-4 border-t border-gray-200">
           <div className="sidebar-status">
             <div className="sidebar-level"><span style={{ height: `${distance === null ? 32 : Math.max(12, Math.min(88, 100 - distance / 2))}%`, backgroundColor: config.color }} /></div>
-            <div><p className="text-[11px] text-gray-500">สถานีวัดต้นสน</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
+            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือแปลงที่หนึ่ง</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
           </div>
         </div>
 
@@ -686,14 +687,14 @@ function App() {
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
-                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำ</p><h1>ภาพรวมสถานี</h1><p>วัดต้นสน · เพชรบุรี · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
+                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือแปลงที่หนึ่ง · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
               <motion.div layout className="water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs font-medium text-gray-600">วัดต้นสน เพชรบุรี</span>
+                    <span className="text-xs font-medium text-gray-600">นาเกลือแปลงที่หนึ่ง</span>
                   </div>
                   <motion.span animate={{ backgroundColor: [config.bg, config.bg + '80', config.bg] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-[11px] font-bold px-2 py-1 rounded" style={{ color: config.color, backgroundColor: config.bg }}>
                     {config.label}
@@ -737,7 +738,7 @@ function App() {
                   </div>
                 )}
 
-                <h3 className="text-sm font-bold text-gray-900 mb-1">แม่น้ำ</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-1">นาเกลือ</h3>
                 <p className="text-xs text-gray-500 mb-4">{connected ? config.evacuate : 'รอข้อมูล'}</p>
 
                 {/* WiFi RSSI */}
@@ -892,9 +893,9 @@ function App() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="≥ 30 ซม." desc="ไม่ต้องอพยพ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="21–30 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="< 21 ซม." desc="อพยพทันที" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 25 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="10–25 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 10 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
               </div>
             </div>
 
@@ -917,8 +918,8 @@ function App() {
                   <tbody>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">วัดต้นสน เพชรบุรี</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">แม่น้ำ</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือแปลงที่หนึ่ง</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">นาเกลือ</td>
                       <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
                       <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
                         <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: config.bg, color: config.color }}>
@@ -1062,11 +1063,11 @@ function App() {
                 <div className="rounded-lg border bg-white p-4 sm:p-6 space-y-4">
                   <div>
                     <p className="font-medium text-gray-900">COAST GUARD AI</p>
-                    <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำอัจฉริยะ</p>
+                    <p className="text-sm text-gray-600 mt-1">ระบบตัววัดระดับน้ำเพื่อบริหารนาเกลือ</p>
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-600">
-                      ระบบนี้ใช้เซ็นเซอร์อัลตราโซนิกเพื่อวัดระดับน้ำในแม่น้ำอย่างแม่นยำและเรียลไทม์
+                      ระบบนี้ใช้เซ็นเซอร์อัลตราโซนิกเพื่อวัดระดับน้ำในนาเกลืออย่างแม่นยำและเรียลไทม์
                       เพื่อให้ข้อมูลการเตือนสัญญาณที่ทันท่วงที
                     </p>
                   </div>
