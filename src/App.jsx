@@ -405,7 +405,7 @@ function App() {
             distance: rounded,
             status: getWaterStatus(rounded),
             rssi: incomingRssi ?? null,
-            location: 'นาเกลือแปลงที่หนึ่ง',
+            location: 'นาเกลือ ณ ที่หนึ่ง',
           }).then(({ error }) => { if (error) console.warn('Supabase insert error:', error.message) })
         }
       }
@@ -444,7 +444,7 @@ function App() {
           distance,
           status,
           prev_status: prevStatusRef.current,
-          location: 'นาเกลือแปลงที่หนึ่ง',
+          location: 'นาเกลือ ณ ที่หนึ่ง',
         }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       }
       prevStatusRef.current = status
@@ -516,7 +516,7 @@ function App() {
             <div className="brand-mark w-9 h-9 rounded-lg flex items-center justify-center">
               <Droplets className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <div><span className="block font-bold text-gray-900">AquaSense</span><span className="block text-[10px] text-gray-500 tracking-[.14em]">COASTAL MONITOR</span></div>
+            <div className="min-w-0"><span className="block font-bold text-gray-900 text-[12px] leading-tight">WATER LEVEL MONITORING SYSTEM WITH ESP32</span><span className="block text-[10px] text-gray-500 leading-tight mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</span></div>
             <button type="button" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} className="sidebar-close ml-auto lg:hidden"><span aria-hidden="true">×</span></button>
           </div>
         </div>
@@ -572,12 +572,12 @@ function App() {
         <div className="p-4 border-t border-gray-200">
           <div className="sidebar-status">
             <div className="sidebar-level"><span style={{ height: `${distance === null ? 32 : Math.max(12, Math.min(88, 100 - distance / 2))}%`, backgroundColor: config.color }} /></div>
-            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือแปลงที่หนึ่ง</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
+            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือ ณ ที่หนึ่ง</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
           </div>
         </div>
 
         <div className="p-4 border-t border-gray-200 text-xs text-gray-400 text-center">
-          PSR COAST GUARD AI © 2026
+          PSR · WATER LEVEL MONITORING SYSTEM WITH ESP32 © 2026
         </div>
       </div>
 
@@ -687,14 +687,14 @@ function App() {
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
-                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือแปลงที่หนึ่ง · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
+                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือ ณ ที่หนึ่ง · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
               <motion.div layout className="water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6" style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs font-medium text-gray-600">นาเกลือแปลงที่หนึ่ง</span>
+                    <span className="text-xs font-medium text-gray-600">นาเกลือ ณ ที่หนึ่ง</span>
                   </div>
                   <motion.span animate={{ backgroundColor: [config.bg, config.bg + '80', config.bg] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-[11px] font-bold px-2 py-1 rounded" style={{ color: config.color, backgroundColor: config.bg }}>
                     {config.label}
@@ -918,7 +918,7 @@ function App() {
                   <tbody>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือแปลงที่หนึ่ง</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือ ณ ที่หนึ่ง</td>
                       <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">นาเกลือ</td>
                       <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
                       <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
@@ -1062,8 +1062,8 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">เกี่ยวกับระบบ</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6 space-y-4">
                   <div>
-                    <p className="font-medium text-gray-900">COAST GUARD AI</p>
-                    <p className="text-sm text-gray-600 mt-1">ระบบตัววัดระดับน้ำเพื่อบริหารนาเกลือ</p>
+                    <p className="font-medium text-gray-900">WATER LEVEL MONITORING SYSTEM WITH ESP32</p>
+                    <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</p>
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-600">
@@ -1073,7 +1073,7 @@ function App() {
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-xs text-gray-500">เวอร์ชัน 1.0.0</p>
-                    <p className="text-xs text-gray-500 mt-1">PSR COAST GUARD AI © 2026</p>
+                    <p className="text-xs text-gray-500 mt-1">PSR · WATER LEVEL MONITORING SYSTEM WITH ESP32 © 2026</p>
                   </div>
                 </div>
               </div>

@@ -11,9 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-icon.svg'],
       manifest: {
-        name: 'COAST GUARD AI — ระบบตัววัดระดับน้ำเพื่อบริหารนาเกลือ',
-        short_name: 'COAST GUARD AI',
-        description: 'ระบบตัววัดระดับน้ำเพื่อบริหารนาเกลือ ตรวจวัดและแจ้งเตือนแบบเรียลไทม์',
+        name: 'WATER LEVEL MONITORING SYSTEM WITH ESP32',
+        // short_name คือชื่อใต้ไอคอนตอนติดตั้งเป็นแอป ต้องสั้น ไม่งั้นถูกตัดกลางคำ
+        short_name: 'Water Level',
+        description: 'ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ ด้วย ESP32',
         theme_color: '#3b82f6',
         background_color: '#f9fafb',
         display: 'standalone',
