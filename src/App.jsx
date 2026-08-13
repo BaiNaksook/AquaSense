@@ -185,27 +185,20 @@ function WifiBars({ rssi }) {
 }
 
 // ===== Status Card =====
-function StatusCard({ icon: Icon, label, range, desc, color, isActive, theme }) {
-  const inactiveBg = theme === 'dark' ? '#111827' : '#ffffff'
-  const inactiveBorder = theme === 'dark' ? '#374151' : 'rgba(0,0,0,0.08)'
-
+function StatusCard({ icon: Icon, label, range, desc, color, isActive }) {
   return (
     <motion.div
-      whileHover={{ scale: 1.02 }}
-      className="p-4 rounded-lg border transition-all duration-300"
-      style={{
-        backgroundColor: isActive ? color + '10' : inactiveBg,
-        borderColor: isActive ? color : inactiveBorder,
-      }}
+      whileHover={{ y: -3 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+      className={`metric-tile${isActive ? ' is-active' : ''}`}
+      style={{ '--tone': color }}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-5 h-5" style={{ color }} />
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color }}>
-          {label}
-        </span>
+      <div className="metric-tile__head">
+        <span className="metric-tile__icon"><Icon className="w-4 h-4" /></span>
+        <span className="metric-tile__label">{label}</span>
       </div>
-      <p className="text-sm font-bold text-gray-900">{range}</p>
-      <p className="text-xs text-gray-500">{desc}</p>
+      <p className="metric-tile__range">{range}</p>
+      <p className="metric-tile__desc">{desc}</p>
     </motion.div>
   )
 }
@@ -702,22 +695,22 @@ function App() {
                 </div>
 
                 <div className="gauge-layout"><div className="water-gauge" aria-hidden="true"><motion.span animate={{ height: `${distance === null ? 18 : Math.max(8, Math.min(94, 100 - distance / 2))}%` }} transition={{ duration: .7 }} style={{ backgroundColor: config.color }}><i /></motion.span></div><div><p className="reading-label">ระยะจากเซ็นเซอร์ถึงผิวน้ำ</p><div className="mb-4 flex items-end gap-2">
-                  <div className="relative overflow-hidden h-[4.5rem] sm:h-[5rem] flex items-center">
+                  <div className="relative overflow-hidden h-[4.75rem] sm:h-[6rem] flex items-center">
                     <AnimatePresence mode="popLayout">
                       <motion.span
                         key={distance}
-                        initial={{ y: 24, opacity: 0 }}
+                        initial={{ y: 28, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -24, opacity: 0 }}
+                        exit={{ y: -28, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="text-5xl sm:text-6xl font-black tracking-tight"
-                        style={{ color: config.color }}
+                        className="text-6xl sm:text-7xl font-black tabular-nums leading-none"
+                        style={{ color: config.color, letterSpacing: '-0.045em' }}
                       >
                         {distance ?? '--'}
                       </motion.span>
                     </AnimatePresence>
                   </div>
-                  <span className="text-sm font-medium text-gray-500 mb-2">ซม.</span>
+                  <span className="text-base font-semibold text-gray-500 mb-2">ซม.</span>
                 </div></div></div>
 
                 {/* ระดับน้ำจริง — มีเมื่อ Arduino ตั้งความสูงเซ็นเซอร์ไว้ (SET HEIGHT) */}
