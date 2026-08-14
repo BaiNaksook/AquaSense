@@ -695,7 +695,7 @@ function App() {
                 </div>
 
                 <div className="gauge-layout"><div className="water-gauge" aria-hidden="true"><motion.span animate={{ height: `${distance === null ? 18 : Math.max(8, Math.min(94, 100 - distance / 2))}%` }} transition={{ duration: .7 }} style={{ backgroundColor: config.color }}><i /></motion.span></div><div><p className="reading-label">ระยะจากเซ็นเซอร์ถึงผิวน้ำ</p><div className="mb-4 flex items-end gap-2">
-                  <div className="relative overflow-hidden h-[4.75rem] sm:h-[6rem] flex items-center">
+                  <div className="relative overflow-hidden h-[4.25rem] sm:h-[5.25rem] flex items-end">
                     <AnimatePresence mode="popLayout">
                       <motion.span
                         key={distance}
@@ -703,14 +703,14 @@ function App() {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -28, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="reading-value text-6xl sm:text-7xl font-black tabular-nums leading-none"
-                        style={{ color: config.color, letterSpacing: '-0.045em' }}
+                        className="reading-value text-6xl sm:text-7xl lg:text-6xl xl:text-7xl font-bold tabular-nums leading-none"
+                        style={{ color: config.color, letterSpacing: '-0.03em' }}
                       >
                         {distance ?? '--'}
                       </motion.span>
                     </AnimatePresence>
                   </div>
-                  <span className="text-base font-semibold text-gray-500 mb-2">ซม.</span>
+                  <span className="text-base font-medium text-gray-500 pb-1">ซม.</span>
                 </div></div></div>
 
                 {/* ระดับน้ำจริง — มีเมื่อ Arduino ตั้งความสูงเซ็นเซอร์ไว้ (SET HEIGHT) */}
@@ -751,7 +751,7 @@ function App() {
                   </div>
                 )}
 
-                <div className="text-xs text-gray-400 flex items-center justify-between pt-4 border-t border-gray-100">
+                <div className="mt-auto text-xs text-gray-400 flex items-center justify-between pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-1.5">
                     {connected && (
                       <motion.span
