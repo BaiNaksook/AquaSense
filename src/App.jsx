@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Droplets, AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import mqtt from 'mqtt'
 import { supabase } from './supabase'
 
@@ -506,8 +506,8 @@ function App() {
       >
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="brand-mark w-9 h-9 rounded-lg flex items-center justify-center">
-              <Droplets className="w-4 h-4 text-white" strokeWidth={2.5} />
+            <div className="brand-mark w-9 h-9 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img src="/pwa-icon.png" alt="ตราโรงเรียน" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0"><span className="block font-bold text-gray-900 text-[12px] leading-tight">WATER LEVEL MONITORING SYSTEM WITH ESP32</span><span className="block text-[10px] text-gray-500 leading-tight mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</span></div>
             <button type="button" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} className="sidebar-close ml-auto lg:hidden"><span aria-hidden="true">×</span></button>

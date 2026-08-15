@@ -108,8 +108,8 @@ button:focus-visible,
   box-shadow: 10px 0 40px -20px rgba(12, 30, 44, .18);
 }
 .brand-mark {
-  background: linear-gradient(140deg, var(--primary), color-mix(in srgb, var(--focus) 70%, var(--primary)));
-  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--primary) 70%, transparent);
+  box-shadow: 0 4px 12px -4px rgba(12, 30, 44, .35);
+  border: 1px solid var(--border);
 }
 .sidebar-close {
   width: 34px; height: 34px;

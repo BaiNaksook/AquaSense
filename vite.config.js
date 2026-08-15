@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'pwa-icon.svg'],
+      includeAssets: ['favicon.png', 'pwa-icon.png'],
       manifest: {
         name: 'WATER LEVEL MONITORING SYSTEM WITH ESP32',
         // short_name คือชื่อใต้ไอคอนตอนติดตั้งเป็นแอป ต้องสั้น ไม่งั้นถูกตัดกลางคำ
@@ -23,15 +23,15 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: 'pwa-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'pwa-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'pwa-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'pwa-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable',
           },
         ],
