@@ -16,10 +16,10 @@ const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 const STALE_MS = 20000
 
 // ===== Status Logic =====
-// เกณฑ์ตรงกับ ESP32 (esp-prs.ino): <= 10 แดง, <= 25 เหลือง, > 25 เขียว
+// เกณฑ์ตรงกับ ESP32 (esp-prs.ino): <= 23 แดง, <= 30 เหลือง, > 30 เขียว
 // ระยะน้อย = น้ำสูง เพราะวัดจากเซ็นเซอร์ลงมาถึงผิวน้ำ
-const RED_MAX = 10
-const YELLOW_MAX = 25
+const RED_MAX = 23
+const YELLOW_MAX = 30
 
 function getWaterStatus(distance) {
   if (distance <= RED_MAX) return 'danger'
@@ -891,9 +891,9 @@ function App() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 25 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="10–25 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 10 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 30 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="23–30 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 23 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
               </div>
             </div>
 
