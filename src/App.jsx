@@ -16,10 +16,10 @@ const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
 const STALE_MS = 20000
 
 // ===== Status Logic =====
-// เกณฑ์ตรงกับ ESP32 (esp-prs.ino): <= 23 แดง, <= 30 เหลือง, > 30 เขียว
+// เกณฑ์ตรงกับ ESP32 (esp-prs.ino): <= 32.4 แดง, <= 45 เหลือง, > 45 เขียว
 // ระยะน้อย = น้ำสูง เพราะวัดจากเซ็นเซอร์ลงมาถึงผิวน้ำ
-const RED_MAX = 23
-const YELLOW_MAX = 30
+const RED_MAX = 32.4
+const YELLOW_MAX = 45
 
 function getWaterStatus(distance) {
   if (distance <= RED_MAX) return 'danger'
@@ -398,7 +398,7 @@ function App() {
             distance: rounded,
             status: getWaterStatus(rounded),
             rssi: incomingRssi ?? null,
-            location: 'นาเกลือ ณ ที่หนึ่ง',
+            location: 'นาเกลือ แปลงที่ 1',
           }).then(({ error }) => { if (error) console.warn('Supabase insert error:', error.message) })
         }
       }
@@ -437,7 +437,7 @@ function App() {
           distance,
           status,
           prev_status: prevStatusRef.current,
-          location: 'นาเกลือ ณ ที่หนึ่ง',
+          location: 'นาเกลือ แปลงที่ 1',
         }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       }
       prevStatusRef.current = status
@@ -565,7 +565,7 @@ function App() {
         <div className="p-4 border-t border-gray-200">
           <div className="sidebar-status">
             <div className="sidebar-level"><span style={{ height: `${distance === null ? 32 : Math.max(12, Math.min(88, 100 - distance / 2))}%`, backgroundColor: config.color }} /></div>
-            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือ ณ ที่หนึ่ง</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
+            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือ แปลงที่ 1</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
           </div>
         </div>
 
@@ -680,14 +680,14 @@ function App() {
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
-                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือ ณ ที่หนึ่ง · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
+                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือ แปลงที่ 1 · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
               <motion.div layout className={`water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6${isAlert && connected ? ' is-alert' : ''}`} style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs font-medium text-gray-600">นาเกลือ ณ ที่หนึ่ง</span>
+                    <span className="text-xs font-medium text-gray-600">นาเกลือ แปลงที่ 1</span>
                   </div>
                   <motion.span animate={{ backgroundColor: [config.bg, config.bg + '80', config.bg] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-[11px] font-bold px-2 py-1 rounded" style={{ color: config.color, backgroundColor: config.bg }}>
                     {config.label}
@@ -891,9 +891,9 @@ function App() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 30 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="23–30 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 23 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 45 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
+                <StatusCard icon={Zap} label="เฝ้าระวัง" range="32.4–45 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
+                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 32.4 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
               </div>
             </div>
 
@@ -916,7 +916,7 @@ function App() {
                   <tbody>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือ ณ ที่หนึ่ง</td>
+                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือ แปลงที่ 1</td>
                       <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">นาเกลือ</td>
                       <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
                       <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
