@@ -6,17 +6,17 @@ self.addEventListener('push', (event) => {
   const status = data.status ?? 'safe'
 
   const iconMap = {
-    safe: '/pwa-icon.svg',
-    warning: '/pwa-icon.svg',
-    danger: '/pwa-icon.svg',
-    critical: '/pwa-icon.svg',
+    safe: '/pwa-icon.png',
+    warning: '/pwa-icon.png',
+    danger: '/pwa-icon.png',
+    critical: '/pwa-icon.png',
   }
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: iconMap[status] ?? '/pwa-icon.svg',
-      badge: '/pwa-icon.svg',
+      icon: iconMap[status] ?? '/pwa-icon.png',
+      badge: '/pwa-icon.png',
       tag: 'aquasense-alert',
       renotify: true,
       vibrate: status === 'critical' ? [200, 100, 200, 100, 200] : [200, 100, 200],
