@@ -1,48 +1,6 @@
-import { useState } from 'react'
-import { MapPin } from 'lucide-react'
 import { RED_MAX, YELLOW_MAX } from '../water'
 import { BE_READY_MIN, BE_BITTER } from '../salinity'
-import { SALT_PLACES, gpsPlace, isValidPlace } from '../places'
-
-// เลือกพื้นที่พยากรณ์: จากรายการแหล่งนาเกลือ หรือ GPS ของมือถือ
-function PlacePicker({ place, onPlace }) {
-  const [gps, setGps] = useState(null) // null | 'finding' | ข้อความผิดพลาด
-  const useMyLocation = () => {
-    if (!navigator.geolocation) { setGps('มือถือเครื่องนี้หาตำแหน่งไม่ได้ เลือกจากรายการแทน'); return }
-    setGps('finding')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const p = gpsPlace(pos.coords.latitude, pos.coords.longitude)
-        if (!isValidPlace(p)) { setGps('ตำแหน่งที่ได้อยู่นอกประเทศไทย เลือกจากรายการแทน'); return }
-        setGps(null)
-        onPlace(p)
-      },
-      (err) => setGps(err.code === 1
-        ? 'ยังไม่ได้อนุญาตให้ใช้ตำแหน่ง กด "อนุญาต" เมื่อมือถือถาม หรือเลือกจากรายการแทน'
-        : 'หาตำแหน่งไม่สำเร็จ ลองออกไปที่โล่งแล้วกดใหม่'),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 },
-    )
-  }
-  return (
-    <>
-      <div className="places" role="group" aria-label="พื้นที่พยากรณ์อากาศ">
-        {SALT_PLACES.map((p) => (
-          <button key={p.id} type="button" aria-pressed={place.id === p.id} onClick={() => onPlace(p)}>
-            {p.name}
-          </button>
-        ))}
-        {!SALT_PLACES.some((p) => p.id === place.id) && (
-          <button type="button" aria-pressed="true">{place.name}</button>
-        )}
-      </div>
-      <button type="button" className="btn" onClick={useMyLocation} disabled={gps === 'finding'}>
-        <MapPin className="w-5 h-5" aria-hidden="true" />
-        {gps === 'finding' ? 'กำลังหาตำแหน่ง…' : 'ใช้ตำแหน่งของฉันตอนนี้ (ยืนอยู่ที่นา)'}
-      </button>
-      {gps && gps !== 'finding' && <p className="gps-status" role="status">{gps}</p>}
-    </>
-  )
-}
+import PlacePicker from '../PlacePicker'
 
 function Choice({ id, value, options, onChange, label }) {
   return (
@@ -81,7 +39,10 @@ export default function SettingsPage({ theme, onTheme, soundOn, onSound, place, 
 
       <section className="panel setting about">
         <h2>เกี่ยวกับ SaltSense</h2>
-        <p>แอปดูน้ำและความเค็มในนาเกลือ กล่องวัดน้ำ (ESP32) ส่งค่ามาทุก 2 วินาที พร้อมพยากรณ์อากาศสำหรับชาวนาเกลือ</p>
+        <p>ดูน้ำในนา ดีกรีน้ำ และฟ้าฝน สำหรับชาวนาเกลือ</p>
+        <details>
+          <summary>สำหรับช่างและครู</summary>
+        <p>กล่องวัดน้ำ (ESP32) วัดระยะจากกล่องลงไปถึงผิวน้ำ ส่งค่ามาทุก 2 วินาที</p>
         <dl>
           <dt>นาเกลือ</dt><dd>{stationName}</dd>
           <dt>น้ำปกติ</dt><dd>กล่องวัดห่างผิวน้ำเกิน {YELLOW_MAX} ซม.</dd>
@@ -91,6 +52,7 @@ export default function SettingsPage({ theme, onTheme, soundOn, onSound, place, 
           <dt>ฟ้าฝน</dt><dd>Open-Meteo / กรมอุตุนิยมวิทยา · {place.name} ({place.lat}, {place.lon})</dd>
           <dt>รุ่น</dt><dd>{version}</dd>
         </dl>
+        </details>
         <p>PSR · SaltSense © 2026</p>
       </section>
     </div>

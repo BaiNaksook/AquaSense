@@ -39,7 +39,10 @@
   transition: transform 400ms var(--ease);
 }
 .wp-water__body { fill: var(--wp-water); fill-opacity: .55; }
-.wp--dark .wp-water__body { fill-opacity: .4; }
+.wp--dark .wp-water__body { fill-opacity: .6; }
+/* บนพื้นแดง/เทาเข้ม: เส้นหนาขึ้น มีขอบเข้ม ให้เห็นแม้จมอยู่ในน้ำ */
+.wp--dark .wp-line { stroke-width: 4; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, .9)); }
+.wp--dark .wp-label { paint-order: stroke; stroke: rgba(0, 0, 0, .75); stroke-width: 4px; }
 .wp-water__surface { fill: none; stroke: var(--wp-water); stroke-width: 3; }
 
 /* ค่าเก่า: ลายเส้นทแยงและจางลง */
@@ -56,7 +59,7 @@
 
 .wp-label {
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 700;
   fill: var(--wp-ink);
   /* ขอบสีพื้นรอบตัวหนังสือ ให้อ่านได้แม้ทับน้ำ */

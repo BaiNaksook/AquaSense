@@ -91,7 +91,7 @@ export default function WaterPan({ distance, status, stale = false, onDark = fal
       <path className="wp-line wp-line--warn" d={`M${PAN_LEFT} ${WARN_Y}H${PAN_RIGHT}`} />
       <path className="wp-line wp-line--danger" d={`M${PAN_LEFT} ${DANGER_Y}H${PAN_RIGHT}`} />
       <text className="wp-label wp-label--warn" x={PAN_RIGHT - 4} y={WARN_Y - 7} textAnchor="end">
-        เฝ้าระวัง
+        เริ่มขึ้น
       </text>
       <text className="wp-label wp-label--danger" x={PAN_RIGHT - 4} y={DANGER_Y - 7} textAnchor="end">
         ขีดอันตราย

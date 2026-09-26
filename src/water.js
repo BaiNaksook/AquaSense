@@ -19,7 +19,7 @@ export function marginToDanger(distance) {
 export const WATER_STATUS = {
   safe: { label: 'น้ำยังดีอยู่', level: 1, tone: 'var(--safe)', todo: 'ทำนาตามปกติได้เลย' },
   warning: { label: 'น้ำเริ่มขึ้นแล้ว', level: 2, tone: 'var(--warning)', todo: 'แวะมาดูน้ำบ่อยๆ หน่อย' },
-  danger: { label: 'น้ำขึ้นสูงแล้ว!', level: 3, tone: 'var(--danger)', todo: 'รีบไขน้ำออกเลย' },
+  danger: { label: 'น้ำในนาสูงแล้ว!', level: 3, tone: 'var(--danger)', todo: 'รีบปล่อยน้ำออกเลย' },
   unknown: { label: 'ยังไม่รู้ระดับน้ำ', level: 0, tone: 'var(--muted)', todo: 'รอกล่องวัดน้ำส่งค่ามาก่อน' },
 }
 

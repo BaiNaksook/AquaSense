@@ -19,8 +19,8 @@
 .wk-summary[data-tone="accent"] .wk-summary__text { color: var(--accent); }
 .wk-summary[data-tone="warning"] { border-color: var(--warning); border-width: 2.5px; }
 .wk-summary[data-tone="warning"] .wk-summary__text { color: var(--warning); }
-.wk-summary[data-tone="danger"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
-.wk-summary[data-tone="danger"] .wk-summary__label { color: var(--on-danger); }
+.wk-summary[data-tone="rain"] { border-color: var(--primary); border-width: 2.5px; }
+.wk-summary[data-tone="rain"] .wk-summary__text { color: var(--primary); }
 
 /* ---------- ปฏิทินเก็บเกลือ (แถวแนวตั้ง) ---------- */
 .wk-cal { padding: var(--space-4); display: grid; gap: var(--space-3); }
@@ -64,11 +64,9 @@
 .wk-row[data-tone="accent"] .wk-row__verdict { color: var(--accent); }
 .wk-row[data-tone="warning"] { border-color: var(--warning); border-width: 2.5px; }
 .wk-row[data-tone="warning"] .wk-row__verdict { color: var(--warning); }
-.wk-row[data-tone="danger"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
-.wk-row[data-tone="danger"] .wk-row__verdict,
-.wk-row[data-tone="danger"] .wk-row__wxicon,
-.wk-row[data-tone="danger"] .wk-row__wxtext,
-.wk-row[data-tone="danger"] .muted { color: var(--on-danger); }
+/* ฝน = สีน้ำเค็ม ไม่ใช่สีแดง (แดงสงวนไว้ให้น้ำในนาสูงอันตราย) */
+.wk-row[data-tone="rain"] { border-color: var(--primary); border-width: 2.5px; }
+.wk-row[data-tone="rain"] .wk-row__verdict, .wk-row[data-tone="rain"] .wk-row__wxicon { color: var(--primary); }
 
 @media (min-width: 640px) {
   .wk-cal__head, .wk-row {
@@ -86,7 +84,7 @@
 /* ---------- อากาศวันนี้ ---------- */
 .wx { padding: var(--space-4); display: grid; gap: var(--space-3); }
 .wx[data-level="warning"] { border-color: var(--warning); border-width: 2.5px; --tone: var(--warning); }
-.wx[data-level="danger"] { border-color: var(--danger); border-width: 2.5px; --tone: var(--danger); }
+.wx[data-level="danger"] { border-color: var(--primary); border-width: 2.5px; --tone: var(--primary); }
 .wx-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .wx-refresh { padding: 0 var(--space-3); }
 .wx-refresh:disabled { opacity: .7; cursor: default; }

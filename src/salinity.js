@@ -16,15 +16,15 @@ export const BRINE_DEPTH_MM = Number(env.VITE_BRINE_DEPTH_MM) || 100
 
 export const SALINITY_STAGES = {
   low: {
-    label: 'ยังเค็มไม่พอ', ready: false, color: 'var(--muted)',
-    advice: 'ตากน้ำต่อไป ยังเก็บไม่ได้',
+    label: 'ยังไม่ได้ดีกรี', ready: false, color: 'var(--muted)',
+    advice: 'ตากน้ำต่อไป ยังรื้อไม่ได้',
   },
   rising: {
     label: 'อีกนิดเดียว', ready: false, color: 'var(--primary)',
-    advice: 'เตรียมไขน้ำเชื้อเข้านาปลง ยังเก็บไม่ได้',
+    advice: 'ตากต่ออีก 1–2 แดด ยังรื้อไม่ได้',
   },
   ready: {
-    label: 'ได้ที่แล้ว', ready: true, color: 'var(--accent)',
+    label: 'ได้ดีกรีแล้ว', ready: true, color: 'var(--accent)',
     advice: 'เกลือกำลังขึ้น เม็ดหนาเมื่อไหร่ก็รื้อได้เลย',
   },
   high: {
@@ -71,7 +71,7 @@ export function predictSalinity(current, days, depthMm = BRINE_DEPTH_MM) {
 }
 
 // ===== ข้อความพยากรณ์ =====
-const THAI_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
+const THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์']
 
 export function formatDay(dateStr, todayStr) {
   if (dateStr === todayStr) return 'วันนี้'
@@ -88,12 +88,12 @@ export function salinityForecastText(stageKey, prediction, todayStr) {
   const parts = []
   if (stageKey === 'low' || stageKey === 'rising') {
     parts.push(readyDay
-      ? `คาดว่าจะพร้อมเก็บ${formatDay(readyDay.date, todayStr) === 'วันนี้' ? 'ภายในวันนี้' : ` ${formatDay(readyDay.date, todayStr)}`}`
-      : 'อีก 7 วันก็ยังไม่ถึงเวลาเก็บ')
+      ? `น่าจะได้ดีกรี${formatDay(readyDay.date, todayStr) === 'วันนี้' ? 'ภายในวันนี้' : `วัน${formatDay(readyDay.date, todayStr)}`}`
+      : 'อีก 7 วันก็ยังไม่ได้ดีกรี')
   } else if (stageKey === 'ready' || stageKey === 'high') {
-    parts.push(bitterDay ? `ควรเก็บให้เสร็จก่อน ${formatDay(bitterDay.date, todayStr)}` : 'ความเค็มจะอยู่ในช่วงเหมาะสมต่อเนื่อง')
+    parts.push(bitterDay ? `รื้อให้เสร็จก่อนวัน${formatDay(bitterDay.date, todayStr)}` : 'ดีกรีจะพอดีไปอีกหลายวัน')
   }
-  if (rainDay) parts.push(`ฝน${formatDay(rainDay.date, todayStr)}อาจทำให้น้ำเค็มเจือจาง`)
+  if (rainDay) parts.push(`ฝน${formatDay(rainDay.date, todayStr).replace(/^(?!วันนี้|พรุ่งนี้)/, 'วัน')}จะทำให้น้ำจืดลง ดีกรีตก`)
   return parts.join(' · ')
 }
 

@@ -30,7 +30,8 @@ const HOURLY_RAIN_PROB = 50          // % ต่อชั่วโมง ใช�
 
 // ระดับคำแนะนำ → สี + ไอคอน (สี + รูปทรง + คำ เพื่อให้คนตาบอดสีแยกได้)
 export const ADVICE_TONE = {
-  danger: { color: 'var(--danger)', icon: OctagonAlert },
+  // ฝนใช้สีน้ำเค็ม — สีแดงสงวนไว้ให้ "น้ำในนาสูงอันตราย" อย่างเดียว
+  danger: { color: 'var(--primary)', icon: OctagonAlert },
   warning: { color: 'var(--warning)', icon: AlertTriangle },
   good: { color: 'var(--safe)', icon: ShieldCheck },
   normal: { color: 'var(--primary)', icon: Info },
@@ -180,14 +181,14 @@ export function getDayAdvice(day) {
     return {
       level: 'danger',
       title: 'ฝนน่าจะตก',
-      advice: `รื้อเกลือขึ้นกองแล้วคลุมไว้ก่อน (ฝน ${day.rainProb}%)`,
+      advice: 'เกลือได้เม็ดแล้วรีบรื้อขึ้นกองคลุมไว้ ฝนหยุดแล้วไขน้ำฝนข้างบนทิ้ง',
     }
   }
   if (day.rainProb >= RAIN_WATCH_PROB || rainMm >= RAIN_WATCH_MM || tmdRain) {
     return {
       level: 'warning',
       title: 'ฝนตั้งเค้า',
-      advice: `เตรียมผ้าใบไว้ใกล้มือ คอยดูฟ้า (${tmdRain && day.rainProb < RAIN_WATCH_PROB ? `กรมอุตุฯ คาดว่า${tmd}` : `ฝน ${day.rainProb}%`})`,
+      advice: `เตรียมผ้าใบไว้ใกล้มือ คอยดูฟ้า${tmdRain && day.rainProb < RAIN_WATCH_PROB ? ` (กรมอุตุฯ คาดว่า${tmd})` : ''}`,
     }
   }
   if (strongWind) {
@@ -205,8 +206,8 @@ export function getDayAdvice(day) {
   ) {
     return {
       level: 'good',
-      title: 'แดดดี ตากเกลือได้',
-      advice: 'แดดดีลมดี ไขน้ำเชื้อเข้านาปลงได้ รื้อเกลือได้',
+      title: 'แดดดี เกลือขึ้นดี',
+      advice: 'ตากน้ำได้ ไขน้ำเชื้อเข้านาปลงได้',
     }
   }
   if ((day.et0 !== null && day.et0 < POOR_ET0_MM) || (day.humidity ?? 0) > POOR_HUMIDITY) {

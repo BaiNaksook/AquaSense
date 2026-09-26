@@ -6,6 +6,7 @@ import WeekPage from './pages/WeekPage'
 import HistoryPage from './pages/HistoryPage'
 import DetailPage from './pages/DetailPage'
 import SettingsPage from './pages/SettingsPage'
+import PlacePicker from './PlacePicker'
 import WeatherPanel from './WeatherPanel'
 import SalinityCard from './SalinityCard'
 import { TabNow, TabWeek, TabHistory, TabSettings, SensorOn, SensorOff } from './icons/SaltIcons'
@@ -116,7 +117,7 @@ const NAV = [
   { id: 'settings', label: 'ตั้งค่า', icon: TabSettings },
 ]
 // หน้า history / detail มีหัวเรื่องของตัวเอง
-const TITLES = { week: 'ฟ้าฝนและวันเก็บเกลือ', settings: 'ตั้งค่า' }
+const TITLES = { week: 'ฟ้าฝนและวันรื้อเกลือ', settings: 'ตั้งค่า' }
 
 // ===== ชวนติดตั้งแอปไว้หน้าจอ (ไม่ใช่ป๊อปอัป — การ์ดในหน้า กดปิดได้ 7 วัน) =====
 function InstallCard({ installPrompt, onInstalled }) {
@@ -134,13 +135,13 @@ function InstallCard({ installPrompt, onInstalled }) {
   }
   return (
     <section className="panel install" aria-labelledby="install-title">
-      <p id="install-title"><strong>วางแอปไว้หน้าจอมือถือ</strong> กดครั้งเดียวก็เปิดดูน้ำได้เลย</p>
+      <p id="install-title"><strong>ให้ลูกหลานช่วยกด:</strong> วางปุ่มเปิดไว้หน้าจอมือถือ ครั้งหน้ากดทีเดียวก็ดูน้ำได้เลย</p>
       {inLine ? (
         <ol><li>กด ⋯ มุมขวาบน</li><li>เลือก "เปิดในเบราว์เซอร์"</li><li>แล้วกลับมาที่หน้านี้อีกครั้ง</li></ol>
       ) : installPrompt ? null : ios ? (
         <ol><li>กดปุ่มแชร์ □↑ ด้านล่าง</li><li>เลือก "เพิ่มไปยังหน้าจอโฮม"</li><li>กด "เพิ่ม"</li></ol>
       ) : (
-        <ol><li>กด ⋮ มุมขวาบน</li><li>เลือก "เพิ่มลงในหน้าจอหลัก"</li><li>กด "เพิ่ม"</li></ol>
+        <ol><li>กด ⋮ หรือ ☰ ของเบราว์เซอร์</li><li>เลือก "เพิ่มลงในหน้าจอหลัก" (Samsung: "เพิ่มหน้าไปที่")</li><li>กด "เพิ่ม"</li></ol>
       )}
       <div className="install__row">
         {installPrompt && !inLine && (
@@ -163,8 +164,11 @@ function App() {
     const saved = storageJSON('weatherPlace', null)
     return isValidPlace(saved) ? saved : DEFAULT_PLACE
   })
+  // ยังไม่เคยเลือกพื้นที่ → ถามตั้งแต่หน้าแรก (ไม่แอบใช้สมุทรสาครเป็นค่าเริ่มต้นเงียบๆ)
+  const [placeChosen, setPlaceChosen] = useState(() => isValidPlace(storageJSON('weatherPlace', null)))
   const changePlace = (p) => {
     setPlace(p)
+    setPlaceChosen(true)
     storageSet('weatherPlace', JSON.stringify(p))
   }
   const weather = useWeather(place)
@@ -386,9 +390,9 @@ function App() {
 
   // ---- ป้ายความสดของข้อมูลบนแถบบน ----
   const fresh = connected
-    ? { tone: 'var(--safe)', icon: SensorOn, text: 'ข้อมูลสด' }
+    ? { tone: 'var(--safe)', icon: SensorOn, text: 'กล่องวัดทำงาน' }
     : isStale
-      ? { tone: lastStatus === 'danger' ? 'var(--danger)' : 'var(--warning)', icon: SensorOff, text: 'กล่องวัดน้ำเงียบ' }
+      ? { tone: 'var(--warning)', icon: SensorOff, text: 'กล่องวัดเงียบ' }
       : { tone: 'var(--muted)', icon: SensorOff, text: 'กำลังต่อ…' }
   const FreshIcon = fresh.icon
 
@@ -425,6 +429,14 @@ function App() {
         acked={acked}
         onAck={() => setAckUntil(Date.now() + ACK_SILENCE_MS)}
         now={now}
+        soundOn={soundOn}
+        placeCard={placeChosen ? null : (
+          <section className="panel setting firstplace">
+            <h2>นาของคุณอยู่แถวไหน</h2>
+            <p>เลือกก่อน ฟ้าฝนกับวันรื้อเกลือจะได้ตรงกับที่นาคุณ (เปลี่ยนทีหลังได้ที่ ตั้งค่า)</p>
+            <PlacePicker place={place} onPlace={changePlace} highlight={false} />
+          </section>
+        )}
         installCard={<InstallCard installPrompt={installPrompt} onInstalled={() => setInstallPrompt(null)} />}
       />
     )

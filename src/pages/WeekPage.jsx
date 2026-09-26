@@ -10,6 +10,8 @@ const WEATHER_ICONS = { storm: CloudLightning, rain: CloudRain, fog: CloudFog, c
 
 const VERDICT_ICONS = {
   harvest: SaltReady,
+  sunny: SunDry,
+  afterRain: RainOnPan,
   cover: CoverPile,
   watch: RainOnPan,
   dry: SunDry,
@@ -26,7 +28,7 @@ function CalendarRow({ row, todayStr }) {
   const { day, be, verdict } = row
   const v = VERDICTS[verdict]
   const WxIcon = WEATHER_ICONS[day.icon] ?? Cloud
-  const VIcon = VERDICT_ICONS[verdict]
+  const VIcon = VERDICT_ICONS[verdict] ?? HelpCircle
   const name = dayName(day.date, todayStr)
   const rainProb = Math.round(day.rainProb ?? 0)
   return (
@@ -51,8 +53,9 @@ function CalendarRow({ row, todayStr }) {
 }
 
 export default function WeekPage({ weather, salinity, salinityStage, salinityPrediction, todayStr }) {
-  const rows = buildHarvestCalendar(weather?.days, salinityPrediction, getDayAdvice)
-  const summary = harvestSummary(rows, todayStr)
+  const rows = buildHarvestCalendar(weather?.days, salinityPrediction, getDayAdvice, { simulated: !!salinity?.simulated })
+  // นอกฤดูทำเกลือ ไม่ควรบอก "วันรื้อเกลือที่ดีที่สุด"
+  const summary = weather?.seasonNote ? { text: weather.seasonNote, tone: 'neutral' } : harvestSummary(rows, todayStr)
   const time = clock(weather?.fetchedAt)
 
   return (
@@ -63,7 +66,7 @@ export default function WeekPage({ weather, salinity, salinityStage, salinityPre
       </section>
 
       <section className="panel wk-cal" aria-labelledby="wk-cal-title">
-        <h2 id="wk-cal-title" className="section-title">ปฏิทินเก็บเกลือ 7 วัน</h2>
+        <h2 id="wk-cal-title" className="section-title">ปฏิทินรื้อเกลือ 7 วัน</h2>
         {rows.length ? (
           <>
             <div className="wk-cal__head" aria-hidden="true">

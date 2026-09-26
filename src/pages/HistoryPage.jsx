@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CircleCheck, TriangleAlert, OctagonAlert, CircleHelp } from 'lucide-react'
-import { WATER_STATUS } from '../water.js'
+import { WATER_STATUS, RED_MAX } from '../water.js'
 import '../styles/history.css'
 
 const STATUS_ICON = { safe: CircleCheck, warning: TriangleAlert, danger: OctagonAlert, unknown: CircleHelp }
@@ -64,7 +64,11 @@ export default function HistoryPage({ alertLog, onClear }) {
                     เปลี่ยนจาก <StatusWord status={e.prevStatus} /> เป็น <StatusWord status={e.status} />
                   </p>
                   {Number.isFinite(Number(e.distance)) && e.distance !== null && (
-                    <p className="hs-item__dist muted">ระยะน้ำ <span className="num">{e.distance}</span> ซม.</p>
+                    <p className="hs-item__dist muted">
+                      {e.distance - RED_MAX > 0
+                        ? <>น้ำต่ำกว่าขีดอันตราย <span className="num">{Math.round(e.distance - RED_MAX)}</span> ซม.</>
+                        : <>น้ำเกินขีดอันตราย <span className="num">{Math.round(RED_MAX - e.distance)}</span> ซม.</>}
+                    </p>
                   )}
                 </li>
               )
