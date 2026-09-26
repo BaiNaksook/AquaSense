@@ -1,15 +1,38 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, Power, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun, Moon, Menu, TrendingUp, TrendingDown, Minus, OctagonAlert, WifiOff } from 'lucide-react'
 import mqtt from 'mqtt'
 import { supabase } from './supabase'
+import WeatherPanel from './WeatherPanel'
+import { useWeather, ADVICE_TONE } from './weather'
 
 // ===== MQTT Config =====
-const MQTT_URL = 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884/mqtt'
-const MQTT_USERNAME = 'Data-Dashbord'
-const MQTT_PASSWORD = 'PsR12345678'
-const MQTT_TOPIC = 'aquasense/sensor/distance'
-const MQTT_CONTROL_TOPIC = 'aquasense/sensor/control'
+// ตั้งค่าผ่าน .env (VITE_MQTT_*) — ค่า fallback คือบัญชีเดิม ควรเปลี่ยนเป็นบัญชีที่ subscribe ได้อย่างเดียว
+// เพราะทุกอย่างที่อยู่ในเว็บฝั่งเบราว์เซอร์ ผู้ใช้เปิดดูได้เสมอ
+const env = import.meta.env
+const MQTT_URL = env.VITE_MQTT_URL || 'wss://c9f0c2cef8584042836e827c368c3c54.s1.eu.hivemq.cloud:8884/mqtt'
+const MQTT_USERNAME = env.VITE_MQTT_USERNAME || 'Data-Dashbord'
+const MQTT_PASSWORD = env.VITE_MQTT_PASSWORD || 'PsR12345678'
+const MQTT_TOPIC = env.VITE_MQTT_TOPIC || 'aquasense/sensor/distance'
+const STATION_NAME = env.VITE_STATION_NAME || 'นาเกลือ แปลงที่ 1'
+
+// กราฟเก็บค่าในหน่วยความจำ — ESP32 ส่งทุก ~2 วิ, 180 ค่า ≈ 6 นาทีล่าสุด
+const HISTORY_MAX = 180
+
+// localStorage อาจใช้ไม่ได้ (โหมดส่วนตัว / ถูกบล็อก) — ห้ามทำให้หน้าเว็บพัง
+function storageGet(key) {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value) } catch { /* ignore */ }
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key) } catch { /* ignore */ }
+}
+
+function formatTime(t) {
+  return new Date(t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
 
 // Arduino ส่งค่าทุก 2 วิ — เงียบเกิน 20 วิ ถือว่าขาดการเชื่อมต่อ
 // (ระบบเตือนภัยห้ามโชว์เลขเก่าค้างไว้เหมือนทุกอย่างปกติ)
@@ -30,7 +53,8 @@ function getWaterStatus(distance) {
 const STATUS_CONFIG = {
   safe: {
     label: 'ปลอดภัย',
-    color: '#22c55e',
+    color: 'var(--safe)',
+    icon: ShieldCheck,
     bg: 'rgba(34,197,94,0.06)',
     border: 'rgba(34,197,94,0.15)',
     evacuate: 'ระดับน้ำปกติ ดำเนินการได้ตามแผน',
@@ -39,7 +63,8 @@ const STATUS_CONFIG = {
   },
   warning: {
     label: 'เฝ้าระวัง',
-    color: '#eab308',
+    color: 'var(--warning)',
+    icon: AlertTriangle,
     bg: 'rgba(234,179,8,0.06)',
     border: 'rgba(234,179,8,0.15)',
     evacuate: 'ติดตามสถานการณ์',
@@ -48,12 +73,24 @@ const STATUS_CONFIG = {
   },
   danger: {
     label: 'อันตราย',
-    color: '#ef4444',
+    color: 'var(--danger)',
+    icon: OctagonAlert,
     bg: 'rgba(239,68,68,0.08)',
     border: 'rgba(239,68,68,0.25)',
     evacuate: 'ควรระบายน้ำออกทันที',
     evacuateSub: 'น้ำสูงมาก เร่งด่วน!',
     shouldEvacuate: true,
+  },
+  // ยังไม่มีข้อมูล / เซ็นเซอร์เงียบ — ห้ามแสดงว่า "ปลอดภัย" ทั้งที่ไม่รู้ค่าจริง
+  unknown: {
+    label: 'ไม่มีข้อมูล',
+    color: 'var(--muted)',
+    icon: WifiOff,
+    bg: 'rgba(148,163,184,0.10)',
+    border: 'rgba(148,163,184,0.25)',
+    evacuate: 'รอข้อมูลจากเซ็นเซอร์',
+    evacuateSub: '',
+    shouldEvacuate: false,
   },
 }
 
@@ -129,14 +166,7 @@ function useClickSound() {
       const gain = ctx.createGain()
       osc.connect(gain)
       gain.connect(ctx.destination)
-      if (type === 'hover') {
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(1200, ctx.currentTime)
-        gain.gain.setValueAtTime(0.025, ctx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04)
-        osc.start(ctx.currentTime)
-        osc.stop(ctx.currentTime + 0.04)
-      } else if (type === 'toggle-on') {
+      if (type === 'toggle-on') {
         osc.frequency.setValueAtTime(600, ctx.currentTime)
         osc.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.08)
         gain.gain.setValueAtTime(0.08, ctx.currentTime)
@@ -206,7 +236,7 @@ function StatusCard({ icon: Icon, label, range, desc, color, isActive }) {
 // ===== Main App =====
 function App() {
   const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme')
+    const savedTheme = storageGet('theme')
     if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme
     return 'light'
   })
@@ -219,23 +249,22 @@ function App() {
   const [rapidRise, setRapidRise] = useState(false)
   const [mqttStatus, setMqttStatus] = useState('connecting')
   const [lastUpdated, setLastUpdated] = useState('')
+  const weather = useWeather()
   const [soundOn, setSoundOn] = useState(true)
   const [history, setHistory] = useState([])
   const [currentPage, setCurrentPage] = useState('home')
   const [chartHoverPoint, setChartHoverPoint] = useState(null)
   const [chartMousePos, setChartMousePos] = useState({ x: 0, y: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sensorOn, setSensorOn] = useState(true)
   const [rssi, setRssi] = useState(null)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [audioUnlockTick, setAudioUnlockTick] = useState(0)
   const [alertLog, setAlertLog] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('alertLog') || '[]') } catch { return [] }
+    try { return JSON.parse(storageGet('alertLog') || '[]') } catch { return [] }
   })
   const prevStatusRef = useRef(null)
 
   const alertIntervalRef = useRef(null)
-  const mqttClientRef = useRef(null)
   const lastDbSaveRef = useRef(null)
   const lastDataAtRef = useRef(null)
   const playSound = useAlertSound()
@@ -249,7 +278,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
-    localStorage.setItem('theme', theme)
+    storageSet('theme', theme)
   }, [theme])
 
   useEffect(() => {
@@ -283,8 +312,8 @@ function App() {
   // ข้อมูลค้างถือว่า "ไม่เชื่อมต่อ" ทั้งหน้าเว็บ — สถานะ ไฟ และเสียงเตือนหยุดตามกันหมด
   const connected = hasData && !isStale
 
-  const status = distance !== null ? getWaterStatus(distance) : 'safe'
-  const config = STATUS_CONFIG[status]
+  const status = distance !== null ? getWaterStatus(distance) : 'unknown'
+  const config = STATUS_CONFIG[connected ? status : 'unknown']
   const isAlert = status === 'danger'
 
   // Browser audio is blocked until the first real user gesture.
@@ -343,10 +372,7 @@ function App() {
     client.on('connect', () => {
       setMqttStatus('connected')
       client.subscribe(MQTT_TOPIC)
-      client.publish(MQTT_CONTROL_TOPIC, 'ON', { retain: true })
     })
-
-    mqttClientRef.current = client
 
     client.on('error', () => setMqttStatus('error'))
     client.on('close', () => setMqttStatus('connecting'))
@@ -381,24 +407,18 @@ function App() {
         setWaterDepth(water === null ? null : Math.round(water * 10) / 10)
         setRiseRate(rise === null ? 0 : Math.round(rise * 10) / 10)
         setRapidRise(rapid)
-        setLastUpdated(
-          new Date().toLocaleTimeString('th-TH', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          })
-        )
-        setHistory((prev) => [...prev.slice(-29), rounded])
+        const now = Date.now()
+        setLastUpdated(formatTime(now))
+        setHistory((prev) => [...prev.slice(-(HISTORY_MAX - 1)), { t: now, v: rounded }])
 
         // ===== Save to Supabase (throttle: ทุก 10 วิ) =====
-        const now = Date.now()
         if (supabase && (!lastDbSaveRef.current || now - lastDbSaveRef.current >= 10000)) {
           lastDbSaveRef.current = now
           supabase.from('water_readings').insert({
             distance: rounded,
             status: getWaterStatus(rounded),
             rssi: incomingRssi ?? null,
-            location: 'นาเกลือ แปลงที่ 1',
+            location: STATION_NAME,
           }).then(({ error }) => { if (error) console.warn('Supabase insert error:', error.message) })
         }
       }
@@ -412,7 +432,7 @@ function App() {
 
   // ===== Alert log on status change =====
   useEffect(() => {
-    if (distance === null) return
+    if (distance === null || !connected) return
     if (prevStatusRef.current === null) {
       prevStatusRef.current = status
       return
@@ -428,7 +448,7 @@ function App() {
       }
       setAlertLog((prev) => {
         const updated = [entry, ...prev].slice(0, 100)
-        localStorage.setItem('alertLog', JSON.stringify(updated))
+        storageSet('alertLog', JSON.stringify(updated))
         return updated
       })
       // Save alert to Supabase
@@ -437,27 +457,27 @@ function App() {
           distance,
           status,
           prev_status: prevStatusRef.current,
-          location: 'นาเกลือ แปลงที่ 1',
+          location: STATION_NAME,
         }).then(({ error }) => { if (error) console.warn('Supabase alert insert error:', error.message) })
       }
       prevStatusRef.current = status
     }
-  }, [status, distance])
+  }, [status, distance, connected])
 
-  // display status: ถ้ามีข้อมูลจริงให้ถือว่า connected
-  const displayConnected = connected || mqttStatus === 'connected'
-  const mqttColor = displayConnected ? '#22c55e' : mqttStatus === 'error' ? '#ef4444' : '#eab308'
-  const mqttText = displayConnected ? 'CONNECTED' : mqttStatus === 'error' ? 'ERROR' : 'CONNECTING'
+  // สถานะที่ผู้ใช้เห็น: ออนไลน์ก็ต่อเมื่อ "ได้ข้อมูลเซ็นเซอร์สดๆ" ไม่ใช่แค่ต่อ MQTT ได้
+  const displayConnected = connected
+  const mqttColor = connected ? 'var(--safe)' : isStale || mqttStatus === 'error' ? 'var(--danger)' : 'var(--warning)'
+  const mqttText = connected
+    ? 'ออนไลน์'
+    : isStale
+      ? 'เซ็นเซอร์ขาดการติดต่อ'
+      : mqttStatus === 'connected'
+        ? 'รอข้อมูลเซ็นเซอร์'
+        : mqttStatus === 'error'
+          ? 'เชื่อมต่อไม่ได้'
+          : 'กำลังเชื่อมต่อ'
   const toggleTheme = () => { playClick('toggle-on'); setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')) }
 
-  const toggleSensor = () => {
-    const next = !sensorOn
-    setSensorOn(next)
-    playClick(next ? 'toggle-on' : 'toggle-off')
-    if (mqttClientRef.current) {
-      mqttClientRef.current.publish(MQTT_CONTROL_TOPIC, next ? 'ON' : 'OFF', { retain: true })
-    }
-  }
   const handlePageChange = (page) => {
     playClick()
     setCurrentPage(page)
@@ -465,21 +485,46 @@ function App() {
   }
 
   // Chart calculations
-  const chartMaxValue = Math.max(...history, 200)
+  const chartMaxValue = Math.max(...history.map((p) => p.v), 200)
   const sparklinePoints = history.length > 1
-    ? history.map((v, i) => {
+    ? history.map(({ v }, i) => {
         const x = (i / (history.length - 1)) * 100
         const y = (v / chartMaxValue) * 200
         return { x, y, value: v }
       })
     : []
 
+  // ===== สิ่งที่ควรทำตอนนี้ (รวมระดับน้ำ + พยากรณ์อากาศ) =====
+  const weatherLevel = weather.todayAdvice?.level
+  const rainComing = weatherLevel === 'danger' || weatherLevel === 'warning' || weather.nextRain !== null
+  const action = (() => {
+    if (connected && status === 'danger') {
+      return {
+        tone: 'var(--danger)', icon: OctagonAlert, title: 'น้ำสูงอันตราย',
+        text: rainComing
+          ? `ระยะน้ำเหลือ ${distance} ซม. และฝนกำลังมา ควรระบายน้ำออกทันที ก่อนน้ำล้นคันและน้ำเกลือเจือจาง`
+          : `ระยะน้ำเหลือ ${distance} ซม. ควรระบายน้ำออกทันที`,
+      }
+    }
+    if (connected && status === 'warning' && rainComing) {
+      return {
+        tone: 'var(--warning)', icon: AlertTriangle, title: 'น้ำเริ่มสูงและอาจมีฝน',
+        text: 'ควรพร่องน้ำออกบางส่วนก่อนฝนตก เพื่อกันน้ำล้นคันนา',
+      }
+    }
+    if (weather.todayAdvice) {
+      const tone = ADVICE_TONE[weather.todayAdvice.level]
+      return { tone: tone.color, icon: tone.icon, title: weather.todayAdvice.title, text: weather.todayAdvice.advice }
+    }
+    return null
+  })()
+
   // ===== Trend =====
   // distance = ระยะจากเซ็นเซอร์ถึงผิวน้ำ
   // distance ลด = น้ำขึ้น | distance เพิ่ม = น้ำลง
   const trend = (() => {
     if (history.length < 4) return 'stable'
-    const recent = history.slice(-4)
+    const recent = history.slice(-4).map((p) => p.v)
     const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
     const diff = avg(recent.slice(2)) - avg(recent.slice(0, 2))
     if (diff < -1) return 'rising'   // distance ลด = น้ำขึ้น
@@ -509,7 +554,7 @@ function App() {
             <div className="brand-mark w-9 h-9 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
               <img src="/pwa-icon.png" alt="ตราโรงเรียน" className="w-full h-full object-cover" />
             </div>
-            <div className="min-w-0"><span className="block font-bold text-gray-900 text-[12px] leading-tight">WATER LEVEL MONITORING SYSTEM WITH ESP32</span><span className="block text-[10px] text-gray-500 leading-tight mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</span></div>
+            <div className="min-w-0"><span className="block font-bold text-gray-900 text-xs leading-tight">WATER LEVEL MONITORING SYSTEM WITH ESP32</span><span className="block text-xs text-gray-500 leading-snug mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</span></div>
             <button type="button" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} className="sidebar-close ml-auto lg:hidden"><span aria-hidden="true">×</span></button>
           </div>
         </div>
@@ -517,7 +562,6 @@ function App() {
         <nav className="flex-1 p-4 space-y-2">
           <motion.button
             whileHover={{ x: 4 }}
-            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('home')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'home' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -528,7 +572,6 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('alerts')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'alerts' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -539,7 +582,6 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -550,7 +592,6 @@ function App() {
           </motion.button>
           <motion.button
             whileHover={{ x: 4 }}
-            onMouseEnter={() => playClick('hover')}
             onClick={() => handlePageChange('about')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all ${
               currentPage === 'about' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
@@ -565,7 +606,7 @@ function App() {
         <div className="p-4 border-t border-gray-200">
           <div className="sidebar-status">
             <div className="sidebar-level"><span style={{ height: `${distance === null ? 32 : Math.max(12, Math.min(88, 100 - distance / 2))}%`, backgroundColor: config.color }} /></div>
-            <div><p className="text-[11px] text-gray-500">สถานีนาเกลือ แปลงที่ 1</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-[11px]" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
+            <div><p className="text-xs text-gray-500">สถานี{STATION_NAME}</p><p className="text-sm font-bold text-gray-900">{distance ?? '--'} ซม.</p><p className="text-xs font-semibold" style={{ color: config.color }}>{connected ? config.label : 'รอข้อมูลเซ็นเซอร์'}</p></div>
           </div>
         </div>
 
@@ -582,20 +623,19 @@ function App() {
             <button
               type="button"
               aria-label="เปิดเมนู"
-              onMouseEnter={() => playClick('hover')}
               onClick={() => { playClick(); setSidebarOpen(true) }}
-              className="lg:hidden text-gray-600 hover:text-gray-900 transition-all p-1.5 rounded-lg hover:bg-gray-100"
+              className="lg:hidden text-gray-600 hover:text-gray-900 transition-all p-2.5 rounded-lg hover:bg-gray-100"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="connection-chip flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                {mqttStatus === 'connected' && (
+                {connected && (
                   <motion.span animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 2, repeat: Infinity }} className="absolute inline-flex h-full w-full rounded-full" style={{ backgroundColor: mqttColor }} />
                 )}
                 <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: mqttColor }} />
               </span>
-              <span className="text-xs font-bold" style={{ color: mqttColor }}>
+              <span className="text-sm font-bold" style={{ color: mqttColor }}>
                 {mqttText}
               </span>
             </div>
@@ -605,50 +645,34 @@ function App() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onMouseEnter={() => playClick('hover')}
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100"
+              className="flex items-center justify-center gap-1.5 min-h-11 min-w-11 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 rounded-lg hover:bg-gray-100"
               aria-label="สลับธีม"
               title="สลับโหมดกลางวัน/กลางคืน"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              <span className="hidden sm:inline text-xs font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+              <span className="hidden sm:inline text-sm font-medium">{theme === 'dark' ? 'กลางวัน' : 'กลางคืน'}</span>
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseEnter={() => playClick('hover')}
-              onClick={toggleSensor}
-              className={`flex items-center gap-1.5 transition-all px-2 sm:px-3 py-1.5 rounded-lg ${
-                sensorOn ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'
-              }`}
-              title="เปิด/ปิดเซ็นเซอร์ ESP32"
-            >
-              <Power className="w-4 h-4" strokeWidth={2.5} />
-              <span className="hidden sm:inline text-xs font-medium">{sensorOn ? 'Sensor On' : 'Sensor Off'}</span>
-            </motion.button>
-
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onMouseEnter={() => playClick('hover')} onClick={() => { playClick(soundOn ? 'toggle-off' : 'toggle-on'); setSoundOn(!soundOn) }} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-gray-100">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { playClick(soundOn ? 'toggle-off' : 'toggle-on'); setSoundOn(!soundOn) }} aria-label={soundOn ? 'ปิดเสียงเตือน' : 'เปิดเสียงเตือน'} aria-pressed={soundOn} className="flex items-center justify-center gap-1.5 min-h-11 min-w-11 text-gray-600 hover:text-gray-900 transition-all px-2 sm:px-3 rounded-lg hover:bg-gray-100">
               <Radio className="w-4 h-4" strokeWidth={soundOn ? 2.5 : 2} />
-              <span className="hidden sm:inline text-xs font-medium">{soundOn ? 'On' : 'Off'}</span>
+              <span className="hidden sm:inline text-sm font-medium">{soundOn ? 'เสียงเตือน เปิด' : 'เสียงเตือน ปิด'}</span>
             </motion.button>
 
             {installPrompt && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onMouseEnter={() => playClick('hover')}
                 onClick={() => {
                   playClick('toggle-on')
                   installPrompt.prompt()
                   installPrompt.userChoice.then(() => setInstallPrompt(null))
                 }}
-                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-all px-2 sm:px-3 py-1.5 rounded-lg hover:bg-blue-50"
+                className="flex items-center justify-center gap-1.5 min-h-11 min-w-11 text-blue-600 hover:text-blue-700 transition-all px-2 sm:px-3 rounded-lg hover:bg-blue-50"
                 title="ติดตั้งแอป"
               >
                 <Zap className="w-4 h-4" />
-                <span className="hidden sm:inline text-xs font-medium">ติดตั้งแอป</span>
+                <span className="hidden sm:inline text-sm font-medium">ติดตั้งแอป</span>
               </motion.button>
             )}
           </div>
@@ -667,11 +691,11 @@ function App() {
                   className="mb-4 sm:mb-6 rounded-lg border px-4 py-3 flex items-center gap-3"
                   style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.3)' }}
                 >
-                  <AlertTriangle className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+                  <WifiOff className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--danger)' }} />
                   <div>
-                    <p className="text-sm font-bold" style={{ color: '#ef4444' }}>ขาดการเชื่อมต่อเซ็นเซอร์</p>
-                    <p className="text-xs text-gray-600">
-                      ไม่ได้รับข้อมูลมา {staleSec} วินาที · ตัวเลขที่เห็นเป็นค่าล่าสุด ไม่ใช่ค่าปัจจุบัน
+                    <p className="text-base font-bold" style={{ color: 'var(--danger)' }}>ขาดการเชื่อมต่อเซ็นเซอร์</p>
+                    <p className="text-sm text-gray-600">
+                      ไม่ได้รับข้อมูลมา {staleSec} วินาที · ตัวเลขที่เห็นเป็นค่าเก่า ให้ตรวจไฟและ WiFi ที่กล่องเซ็นเซอร์
                     </p>
                   </div>
                 </motion.div>
@@ -680,18 +704,28 @@ function App() {
             {/* Home Page */}
             {currentPage === 'home' && (
               <>
-                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>นาเกลือ แปลงที่ 1 · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge"><span />{displayConnected ? 'ระบบออนไลน์' : 'กำลังเชื่อมต่อ'}</span></div>
+                {action && (
+                  <div className="action-banner" style={{ '--tone': action.tone }} role={action.tone === 'var(--danger)' ? 'alert' : undefined}>
+                    <action.icon className="w-8 h-8 flex-shrink-0" aria-hidden="true" />
+                    <div>
+                      <p className="action-banner__title">{action.title}</p>
+                      <p className="action-banner__text">{action.text}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="page-heading"><div><p className="eyebrow">ศูนย์ควบคุมระดับน้ำนาเกลือ</p><h1>ภาพรวมสถานี</h1><p>{STATION_NAME} · ข้อมูลแบบเรียลไทม์</p></div><span className="live-badge" style={{ '--badge': mqttColor }}><span />{displayConnected ? 'ระบบออนไลน์' : mqttText}</span></div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Main Sensor Card */}
               <motion.div layout className={`water-hero lg:col-span-1 rounded-lg border bg-white p-4 sm:p-6${isAlert && connected ? ' is-alert' : ''}`} style={{ '--status': config.color, borderColor: config.border }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                    <span className="text-xs font-medium text-gray-600">นาเกลือ แปลงที่ 1</span>
+                    <span className="text-xs font-medium text-gray-600">{STATION_NAME}</span>
                   </div>
-                  <motion.span animate={{ backgroundColor: [config.bg, config.bg + '80', config.bg] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-[11px] font-bold px-2 py-1 rounded" style={{ color: config.color, backgroundColor: config.bg }}>
+                  <span className="inline-flex items-center gap-1 text-sm font-bold px-2 py-1 rounded" style={{ color: config.color, backgroundColor: config.bg }}>
+                    <config.icon className="w-4 h-4" aria-hidden="true" />
                     {config.label}
-                  </motion.span>
+                  </span>
                 </div>
 
                 <div className="gauge-layout"><div className="water-gauge" aria-hidden="true"><motion.span animate={{ height: `${distance === null ? 18 : Math.max(8, Math.min(94, 100 - distance / 2))}%` }} transition={{ duration: .7 }} style={{ backgroundColor: config.color }}><i /></motion.span></div><div><p className="reading-label">ระยะจากเซ็นเซอร์ถึงผิวน้ำ</p><div className="mb-4 flex items-end gap-2">
@@ -703,7 +737,7 @@ function App() {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -28, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="reading-value text-6xl sm:text-7xl lg:text-6xl xl:text-7xl font-bold tabular-nums leading-none"
+                        className={`reading-value${connected ? '' : ' is-stale'} text-6xl sm:text-7xl lg:text-6xl xl:text-7xl font-bold tabular-nums leading-none`}
                         style={{ color: config.color, letterSpacing: '-0.03em' }}
                       >
                         {distance ?? '--'}
@@ -731,14 +765,13 @@ function App() {
                   </div>
                 )}
 
-                <h3 className="text-sm font-bold text-gray-900 mb-1">นาเกลือ</h3>
-                <p className="text-xs text-gray-500 mb-4">{connected ? config.evacuate : 'รอข้อมูล'}</p>
+                <p className="text-base font-semibold mb-4" style={{ color: connected ? config.color : undefined }}>{config.evacuate}</p>
 
                 {/* WiFi RSSI */}
                 {rssi !== null && (
                   <div className="flex items-center gap-1.5 mb-2 text-xs">
                     <WifiBars rssi={rssi} />
-                    <span className="text-gray-400">{rssi} dBm</span>
+                    <span className="text-gray-500">สัญญาณ WiFi {rssi >= -65 ? 'ดี' : rssi >= -75 ? 'พอใช้' : 'อ่อน'}</span>
                   </div>
                 )}
 
@@ -767,10 +800,20 @@ function App() {
                 </div>
               </motion.div>
 
+              {/* Weather Card */}
+              <div className="lg:col-span-2">
+                <WeatherPanel weather={weather} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Chart Card */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="chart-card lg:col-span-2 rounded-lg border bg-white p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-sm font-bold text-gray-900">กราฟระดับน้ำ(24 ชม.)</h3>
+                    <h3 className="text-sm font-bold text-gray-900">กราฟระยะน้ำล่าสุด</h3>
+                    {history.length > 1 && (
+                      <span className="text-xs text-gray-500">{formatTime(history[0].t)} – {formatTime(history[history.length - 1].t)}</span>
+                    )}
                   </div>
 
                   <div className="relative">
@@ -784,7 +827,7 @@ function App() {
                           ? 'กราฟระดับน้ำ ยังไม่มีข้อมูลเพียงพอ'
                           : `กราฟระดับน้ำย้อนหลัง ${history.length} ค่า ค่าล่าสุด ${distance} เซนติเมตร สถานะ ${config.label}`
                       }
-                      onMouseMove={(e) => {
+                      onPointerMove={(e) => {
                         const svg = e.currentTarget
                         const rect = svg.getBoundingClientRect()
                         const x = ((e.clientX - rect.left) / rect.width) * 500
@@ -804,7 +847,8 @@ function App() {
                           y: e.clientY - containerRect.top,
                         })
                       }}
-                      onMouseLeave={() => setChartHoverPoint(null)}
+                      onPointerDown={(e) => e.currentTarget.releasePointerCapture?.(e.pointerId)}
+                      onPointerLeave={() => setChartHoverPoint(null)}
                       style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.05))' }}
                     >
                       <defs>
@@ -826,6 +870,20 @@ function App() {
                           <text key={i} className="chart-axis" x="30" y={245 - i * 50} fontSize="11" textAnchor="end">
                             {value}
                           </text>
+                        )
+                      })}
+
+                      {/* เส้นเกณฑ์ — ต่ำกว่าเส้นแดง = น้ำสูงอันตราย */}
+                      {[
+                        { v: YELLOW_MAX, color: 'var(--warning)', label: 'เฝ้าระวัง' },
+                        { v: RED_MAX, color: 'var(--danger)', label: 'อันตราย' },
+                      ].map((th) => {
+                        const y = 240 - (th.v / chartMaxValue) * 200
+                        return (
+                          <g key={th.v}>
+                            <line className="chart-threshold" x1="50" x2="480" y1={y} y2={y} style={{ stroke: th.color }} />
+                            <text className="chart-threshold-label" x="476" y={y - 5} textAnchor="end" style={{ fill: th.color }}>{th.label} {th.v}</text>
+                          </g>
                         )
                       })}
 
@@ -857,11 +915,11 @@ function App() {
                         </>
                       )}
 
-                      {/* X-axis labels */}
+                      <text className="chart-axis" x="50" y="268" fontSize="11">ระยะ (ซม.) · เส้นยิ่งต่ำ = น้ำยิ่งสูง</text>
                     </svg>
 
                     {/* Data tooltip */}
-                    {chartHoverPoint !== null && (
+                    {chartHoverPoint !== null && history[chartHoverPoint] && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -874,60 +932,64 @@ function App() {
                         }}
                       >
                         <div className="text-xs text-gray-600 font-medium whitespace-nowrap">
-                          {new Date(new Date().getTime() - (history.length - 1 - chartHoverPoint) * 60000).toLocaleTimeString('th-TH', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit',
-                          })}
+                          {formatTime(history[chartHoverPoint].t)}
                         </div>
-                        <div className="text-sm font-bold text-gray-900">{history[chartHoverPoint]} ซม.</div>
+                        <div className="text-sm font-bold text-gray-900">{history[chartHoverPoint].v} ซม.</div>
                       </motion.div>
                     )}
                   </div>
                 </motion.div>
-            </div>
 
             {/* Status Cards */}
-            <div className="mb-8">
+            <div>
               <h3 className="text-sm font-bold text-gray-900 mb-4">เกณฑ์ระดับน้ำ</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 45 ซม." desc="ระดับน้ำปกติ" color="#22c55e" isActive={status === 'safe' && connected} theme={theme} />
-                <StatusCard icon={Zap} label="เฝ้าระวัง" range="32.4–45 ซม." desc="ติดตามใกล้ชิด" color="#eab308" isActive={status === 'warning' && connected} theme={theme} />
-                <StatusCard icon={AlertTriangle} label="อันตราย" range="≤ 32.4 ซม." desc="น้ำสูง ใกล้ล้น" color="#ef4444" isActive={status === 'danger' && connected} theme={theme} />
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3 sm:gap-4">
+                <StatusCard icon={ShieldCheck} label="ปลอดภัย" range="> 45 ซม." desc="ระดับน้ำปกติ" color="var(--safe)" isActive={status === 'safe' && connected} />
+                <StatusCard icon={AlertTriangle} label="เฝ้าระวัง" range="32.4–45 ซม." desc="ติดตามใกล้ชิด" color="var(--warning)" isActive={status === 'warning' && connected} />
+                <StatusCard icon={OctagonAlert} label="อันตราย" range="≤ 32.4 ซม." desc="น้ำสูง ใกล้ล้น" color="var(--danger)" isActive={status === 'danger' && connected} />
               </div>
             </div>
+            </div>
 
-            {/* Activity Table */}
+            {/* การเปลี่ยนสถานะล่าสุด */}
             <div className="rounded-lg border bg-white overflow-hidden">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-sm font-bold text-gray-900">ประวัติการแจ้งเตือน</h3>
+              <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-gray-900">การแจ้งเตือนล่าสุด</h3>
+                {alertLog.length > 0 && (
+                  <button type="button" onClick={() => handlePageChange('alerts')} className="text-xs font-medium text-blue-600 hover:underline">
+                    ดูทั้งหมด
+                  </button>
+                )}
               </div>
-              <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '300px' }}>
-                <table className="w-full text-sm">
-                  <thead className="border-b border-gray-200 bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานที่</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">จุดตรวจวัด</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระดับน้ำ</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{lastUpdated}</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">นาเกลือ แปลงที่ 1</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">นาเกลือ</td>
-                      <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{distance ?? '--'} ซม.</td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
-                        <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: config.bg, color: config.color }}>
-                          {config.label}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {alertLog.length === 0 ? (
+                <p className="px-4 sm:px-6 py-6 text-sm text-gray-500">ยังไม่มีการเปลี่ยนสถานะ · ระบบจะบันทึกทุกครั้งที่ระดับน้ำเปลี่ยนเกณฑ์</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-gray-200 bg-gray-50">
+                      <tr>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">เวลา</th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">ระยะน้ำ</th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {alertLog.slice(0, 5).map((entry) => {
+                        const curr = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.unknown
+                        return (
+                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{entry.date} {entry.time}</td>
+                            <td className="px-3 sm:px-6 py-3 text-gray-900 font-medium whitespace-nowrap">{entry.distance} ซม.</td>
+                            <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
+                              <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: curr.bg, color: curr.color }}>{curr.label}</span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
               </>
             )}
@@ -942,7 +1004,7 @@ function App() {
                       onClick={() => {
                         if (window.confirm('ลบประวัติทั้งหมด?')) {
                           setAlertLog([])
-                          localStorage.removeItem('alertLog')
+                          storageRemove('alertLog')
                         }
                       }}
                       className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all"
@@ -972,8 +1034,8 @@ function App() {
                         </thead>
                         <tbody>
                           {alertLog.map((entry) => {
-                            const prev = STATUS_CONFIG[entry.prevStatus]
-                            const curr = STATUS_CONFIG[entry.status]
+                            const prev = STATUS_CONFIG[entry.prevStatus] ?? STATUS_CONFIG.unknown
+                            const curr = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.unknown
                             return (
                               <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
                                 <td className="px-3 sm:px-6 py-3 text-gray-600 whitespace-nowrap">{entry.date}</td>
@@ -1002,24 +1064,6 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ตั้งค่า</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6">
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
-                      <div>
-                        <p className="font-medium text-gray-900">เซ็นเซอร์วัดระยะ ESP32</p>
-                        <p className="text-sm text-gray-500">เปิด/ปิดการทำงานของเซ็นเซอร์ผ่าน MQTT</p>
-                      </div>
-                      <button
-                        onClick={toggleSensor}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                          sensorOn
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                        }`}
-                      >
-                        <Power className="w-4 h-4" />
-                        {sensorOn ? 'เปิดอยู่' : 'ปิดอยู่'}
-                      </button>
-                    </div>
-
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
                       <div>
                         <p className="font-medium text-gray-900">ธีมหน้าจอ</p>
