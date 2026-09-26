@@ -39,8 +39,19 @@ ESP32 + อัลตราโซนิก ──MQTT──► HiveMQ Cloud ─�
 cp .env.example .env         # แล้วแก้ค่าให้ถูกต้อง
 npm install
 npm run dev                  # พัฒนา
-npm run build && npm start   # production (Render ใช้ port 10000)
+npm run build                # build → dist/
 ```
+
+## Deploy บน Vercel
+
+ตั้งค่าไว้แล้วใน `vercel.json` (Vite → `dist/`, service worker ไม่ถูก cache ค้าง)
+
+- **ผ่าน CLI:** `npx vercel` (ลิงก์ทดลอง) → `npx vercel --prod` (เว็บจริง)
+- **ผ่าน GitHub:** vercel.com → Add New → Project → เลือก repo นี้ → Deploy
+  ทุกครั้งที่ push เข้า `main` จะ deploy อัตโนมัติ และทุก branch จะได้ลิงก์ preview
+
+ตั้ง Environment Variables (ถ้ามี) ที่ Project → Settings → Environment Variables ตาม `.env.example`
+แล้ว Redeploy เพราะค่า `VITE_*` ถูกฝังตอน build
 
 ## โครงสร้าง
 
