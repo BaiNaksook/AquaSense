@@ -20,12 +20,12 @@ export const SALINITY_STAGES = {
     advice: 'ตากน้ำต่อไป ยังเก็บไม่ได้',
   },
   rising: {
-    label: 'ใกล้แล้ว', ready: false, color: 'var(--primary)',
+    label: 'อีกนิดเดียว', ready: false, color: 'var(--primary)',
     advice: 'เตรียมไขน้ำเชื้อเข้านาปลง ยังเก็บไม่ได้',
   },
   ready: {
-    label: 'พร้อมเก็บ', ready: true, color: 'var(--accent)',
-    advice: 'เกลือกำลังขึ้น รอเม็ดหนาแล้วรื้อได้',
+    label: 'ได้ที่แล้ว', ready: true, color: 'var(--accent)',
+    advice: 'เกลือกำลังขึ้น เม็ดหนาเมื่อไหร่ก็รื้อได้เลย',
   },
   high: {
     label: 'รีบเก็บ', ready: true, color: 'var(--warning)',

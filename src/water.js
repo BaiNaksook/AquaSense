@@ -17,10 +17,10 @@ export function marginToDanger(distance) {
 
 // ป้ายและสีของแต่ละสถานะ — สีดึงจาก token ใน index.css
 export const WATER_STATUS = {
-  safe: { label: 'น้ำปกติ', level: 1, tone: 'var(--safe)', todo: 'ทำนาได้ตามปกติ' },
-  warning: { label: 'น้ำเริ่มสูง', level: 2, tone: 'var(--warning)', todo: 'หมั่นมาดูน้ำบ่อยๆ' },
-  danger: { label: 'น้ำสูง อันตราย', level: 3, tone: 'var(--danger)', todo: 'ปล่อยน้ำออกเดี๋ยวนี้' },
-  unknown: { label: 'ยังไม่มีข้อมูล', level: 0, tone: 'var(--muted)', todo: 'รอกล่องวัดน้ำส่งค่า' },
+  safe: { label: 'น้ำยังดีอยู่', level: 1, tone: 'var(--safe)', todo: 'ทำนาตามปกติได้เลย' },
+  warning: { label: 'น้ำเริ่มขึ้นแล้ว', level: 2, tone: 'var(--warning)', todo: 'แวะมาดูน้ำบ่อยๆ หน่อย' },
+  danger: { label: 'น้ำขึ้นสูงแล้ว!', level: 3, tone: 'var(--danger)', todo: 'รีบไขน้ำออกเลย' },
+  unknown: { label: 'ยังไม่รู้ระดับน้ำ', level: 0, tone: 'var(--muted)', todo: 'รอกล่องวัดน้ำส่งค่ามาก่อน' },
 }
 
 // เวลาที่ผ่านมาแบบคนพูด: "เมื่อสักครู่" / "5 นาทีก่อน" / "2 ชั่วโมงก่อน"

@@ -9,6 +9,12 @@ import { WATER_STATUS, ago, clockTime } from '../water'
 import { useThaiSpeech } from '../speech'
 import { line, numberClips, dayClip, timeClip, CLIP_TEXT } from '../voiceClips'
 
+// "เมื่อสักครู่" มีคำว่าเมื่ออยู่แล้ว ส่วน "5 นาทีก่อน" ต้องเติม
+const agoPhrase = (t, now) => {
+  const a = ago(t, now)
+  return a.startsWith('เมื่อ') ? a : `เมื่อ ${a}`
+}
+
 const WEATHER_ICON = { storm: CloudLightning, rain: RainOnPan, fog: CloudFog, cloud: Cloud, partly: CloudSun, sun: SunDry }
 
 // ===== สถานะน้ำที่ผู้ใช้เห็น (รวมกรณีกล่องวัดน้ำเงียบ) =====
@@ -16,17 +22,17 @@ const WEATHER_ICON = { storm: CloudLightning, rain: RainOnPan, fog: CloudFog, cl
 function describeWater({ status, connected, isStale, lastStatus, rainComing }) {
   if (isStale) {
     if (lastStatus === 'danger') {
-      return { state: 'danger', icon: SensorOff, title: 'กล่องวัดน้ำเงียบไป', todo: 'ล่าสุดน้ำสูงอันตราย ไปดูน้ำที่นาเดี๋ยวนี้' }
+      return { state: 'danger', icon: SensorOff, title: 'กล่องวัดน้ำเงียบไป', todo: 'ครั้งล่าสุดน้ำขึ้นสูง ไปดูที่นาเดี๋ยวนี้' }
     }
-    return { state: 'unknown', icon: SensorOff, title: 'กล่องวัดน้ำเงียบไป', todo: 'ไปดูปลั๊กไฟกับเน็ตที่กล่องวัดน้ำ' }
+    return { state: 'unknown', icon: SensorOff, title: 'กล่องวัดน้ำเงียบไป', todo: 'ไปดูว่าไฟกับเน็ตที่กล่องยังติดอยู่ไหม' }
   }
   if (!connected) {
-    return { state: 'unknown', icon: SensorOff, title: 'กำลังรอข้อมูล', todo: 'กำลังต่อกับกล่องวัดน้ำ รอสักครู่' }
+    return { state: 'unknown', icon: SensorOff, title: 'รอสักครู่', todo: 'กำลังถามกล่องวัดน้ำอยู่' }
   }
   const s = WATER_STATUS[status]
   let todo = s.todo
-  if (status === 'danger' && rainComing) todo = 'ปล่อยน้ำออกเดี๋ยวนี้ ฝนใกล้มาแล้ว'
-  if (status === 'warning' && rainComing) todo = 'พร่องน้ำออกบางส่วน ก่อนฝนตก'
+  if (status === 'danger' && rainComing) todo = 'รีบไขน้ำออก ฝนใกล้มาแล้ว'
+  if (status === 'warning' && rainComing) todo = 'ไขน้ำออกบ้าง ก่อนฝนมา'
   return { state: status, icon: PAN_ICON[status], title: s.label, todo }
 }
 
@@ -46,7 +52,7 @@ export default function NowPage({
   // ---- ความเค็ม ----
   const salt = SALINITY_STAGES[salinityStage]
   const SaltIcon = salt.ready ? SaltReady : salinityStage === 'bitter' ? BitterWater : SaltForming
-  const saltTitle = salt.ready ? 'พร้อมเก็บ' : salinityStage === 'bitter' ? 'น้ำขมแล้ว' : 'ยังไม่พร้อมเก็บ'
+  const saltTitle = salt.ready ? 'เกลือได้ที่แล้ว' : salinityStage === 'bitter' ? 'น้ำขมแล้ว' : 'เกลือยังไม่ได้ที่'
   const saltBe = Math.round(salinity.value)
   const saltForecast = salinityForecastText(salinityStage, salinityPrediction, todayStr)
 
@@ -137,7 +143,7 @@ export default function NowPage({
     ? <p className="hero__margin"><strong>น้ำเกินขีดอันตรายแล้ว</strong></p>
     : (
       <p className="hero__margin">
-        อีก <span className="num">{margin}</span> ซม. ถึงขีดอันตราย
+        อีก <span className="num">{margin}</span> เซน น้ำจะถึงขีดอันตราย
       </p>
     )
 
@@ -160,26 +166,26 @@ export default function NowPage({
 
         <WaterPan distance={distance} status={status} stale={isStale} onDark={water.state === 'danger'} />
         {marginBlock}
-        {isStale && distance !== null && <p className="hero__stale">ตัวเลขนี้เป็นค่าเก่า</p>}
+        {isStale && distance !== null && <p className="hero__stale">ตัวเลขนี้เป็นของเก่า ไม่ใช่ตอนนี้</p>}
         <p className="hero__meta">
-          {lastDataAt ? `อัปเดต${ago(lastDataAt, now)} (${clockTime(lastDataAt)})` : 'ยังไม่ได้รับค่าจากกล่องวัดน้ำ'}
+          {lastDataAt ? `ข้อมูล${agoPhrase(lastDataAt, now)} (${clockTime(lastDataAt)})` : 'ยังไม่ได้ค่าจากกล่องวัดน้ำ'}
         </p>
 
         {unacked && (
           <button type="button" className="btn btn-block" onClick={onAck}>
-            รับทราบ กำลังไปปล่อยน้ำ
+            รู้แล้ว กำลังไปไขน้ำ
           </button>
         )}
         <div className="hero__actions">
           {speech.supported && (
             <button type="button" className="btn" aria-pressed={speech.speaking} onClick={() => (speech.speaking ? speech.stop() : speech.speak(say))}>
               {speech.speaking ? <Square className="w-5 h-5" aria-hidden="true" /> : <Listen className="w-6 h-6" />}
-              {speech.speaking ? 'หยุดพูด' : 'กดฟังเสียง'}
+              {speech.speaking ? 'หยุดอ่าน' : 'อ่านให้ฟัง'}
             </button>
           )}
           <button type="button" className="btn" onClick={share}>
             <Share2 className="w-5 h-5" aria-hidden="true" />
-            ส่งทาง LINE
+            ส่งให้ลูกหลาน
           </button>
         </div>
       </section>
@@ -189,12 +195,12 @@ export default function NowPage({
         <div className="today__head">
           <TodayIcon className="w-10 h-10" aria-hidden="true" />
           <div>
-            <p className="today__label">อากาศวันนี้ที่ {weather.place.name}{today ? ` · ฝน ${today.rainProb}%` : ''}</p>
+            <p className="today__label">ฟ้าฝนวันนี้ แถว {weather.place.name}{today ? ` · ฝน ${today.rainProb}%` : ''}</p>
             <h2 className="today__title">{advice ? advice.title : weather.loading ? 'กำลังโหลด…' : 'ยังไม่มีข้อมูลอากาศ'}</h2>
           </div>
         </div>
         {advice && <p className="today__text">{advice.advice}</p>}
-        {weather.nextRain && <p className="today__text today__next">ฝนอาจเริ่มราว {weather.nextRain.time} น.</p>}
+        {weather.nextRain && <p className="today__text today__next">ฝนน่าจะมาราว {weather.nextRain.time} น.</p>}
         {tomorrowAdvice && (
           <p className="today__foot">พรุ่งนี้: {tomorrowAdvice.title} · ฝน {tomorrow.rainProb}%</p>
         )}
@@ -205,7 +211,7 @@ export default function NowPage({
         <div className="saltnow__row">
           <SaltIcon />
           <div>
-            <p className="today__label">เกลือพร้อมเก็บหรือยัง</p>
+            <p className="today__label">เกลือได้ที่หรือยัง</p>
             <h2 className="saltnow__title">{saltTitle}</h2>
           </div>
           <span className="saltnow__value num">{saltBe}<small>ดีกรี</small></span>
@@ -213,13 +219,13 @@ export default function NowPage({
         <SaltMeter value={salinity.value} compact />
         <p className="saltnow__text">{salt.advice}</p>
         {saltForecast && <p className="saltnow__text">{saltForecast}</p>}
-        {salinity.simulated && <p className="saltnow__demo">ค่าเค็มนี้เป็นค่าตัวอย่าง ยังไม่ได้วัดจริง</p>}
+        {salinity.simulated && <p className="saltnow__demo">ความเค็มนี้เป็นตัวเลขตัวอย่าง ยังไม่ได้วัดจริง</p>}
       </section>
 
       {installCard}
 
       <div className="now__more">
-        <a className="btn btn-quiet" href="#/week">ดูฟ้าฝนและวันเก็บเกลือ 7 วัน <ChevronRight className="w-5 h-5" aria-hidden="true" /></a>
+        <a className="btn btn-quiet" href="#/week">ดูล่วงหน้า 7 วัน วันไหนรื้อเกลือได้ <ChevronRight className="w-5 h-5" aria-hidden="true" /></a>
         <a className="btn btn-quiet" href="#/detail">ข้อมูลละเอียด (สำหรับครู) <ChevronRight className="w-5 h-5" aria-hidden="true" /></a>
       </div>
     </div>

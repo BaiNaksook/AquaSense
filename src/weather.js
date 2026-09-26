@@ -165,14 +165,14 @@ export function getDayAdvice(day) {
   if (thunder || (strongWind && (day.rainProb >= RAIN_WATCH_PROB || rainMm >= RAIN_WATCH_MM))) {
     return {
       level: 'danger',
-      title: 'ระวังพายุฝนฟ้าคะนอง',
+      title: 'พายุเข้า ฟ้าร้องฟ้าผ่า',
       advice: `รื้อเกลือขึ้นกอง มัดผ้าใบให้แน่น ฟ้าร้องให้หลบเข้าที่ร่ม (ลมแรง ${windText} กม./ชม.)`,
     }
   }
   if (rainMm >= RAIN_HEAVY_MM || tmdHeavy) {
     return {
       level: 'danger',
-      title: 'คาดว่าฝนตกหนัก',
+      title: 'ฝนจะตกหนัก',
       advice: `คลุมกองเกลือให้มิด อย่าเพิ่งไขน้ำเชื้อเข้านาปลง ดูคันนากับท่อ (ฝน ${Math.round(rainMm)} มม.)`,
     }
   }
@@ -186,14 +186,14 @@ export function getDayAdvice(day) {
   if (day.rainProb >= RAIN_WATCH_PROB || rainMm >= RAIN_WATCH_MM || tmdRain) {
     return {
       level: 'warning',
-      title: 'อาจมีฝนตก',
+      title: 'ฝนตั้งเค้า',
       advice: `เตรียมผ้าใบไว้ใกล้มือ คอยดูฟ้า (${tmdRain && day.rainProb < RAIN_WATCH_PROB ? `กรมอุตุฯ คาดว่า${tmd}` : `ฝน ${day.rainProb}%`})`,
     }
   }
   if (strongWind) {
     return {
       level: 'warning',
-      title: 'ลมแรง',
+      title: 'ลมแรงนะ',
       advice: `มัดผ้าใบคลุมกองให้แน่น ระวังคลื่นกัดคันนา (ลม ${windText} กม./ชม.)`,
     }
   }
@@ -218,7 +218,7 @@ export function getDayAdvice(day) {
   }
   return {
     level: 'normal',
-    title: 'อากาศปกติ',
+    title: 'ฟ้าโปร่ง ไม่มีอะไร',
     advice: 'ทำนาได้ตามปกติ',
   }
 }
