@@ -11,10 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'pwa-icon.png'],
       manifest: {
-        name: 'WATER LEVEL MONITORING SYSTEM WITH ESP32',
+        name: 'SaltSense — Smart Salt Farm Water Level & Salinity Monitoring System',
         // short_name คือชื่อใต้ไอคอนตอนติดตั้งเป็นแอป ต้องสั้น ไม่งั้นถูกตัดกลางคำ
-        short_name: 'Water Level',
-        description: 'ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ ด้วย ESP32',
+        short_name: 'SaltSense',
+        description: 'ระบบตรวจวัดระดับน้ำและความเค็ม เพื่อการบริหารจัดการนาเกลือ ด้วย ESP32',
         theme_color: '#3b82f6',
         background_color: '#f9fafb',
         display: 'standalone',

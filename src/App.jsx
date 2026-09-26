@@ -363,7 +363,7 @@ function App() {
     const client = mqtt.connect(MQTT_URL, {
       username: MQTT_USERNAME,
       password: MQTT_PASSWORD,
-      clientId: 'AquaSenseWeb_' + Math.random().toString(16).substr(2, 8),
+      clientId: 'SaltSenseWeb_' + Math.random().toString(16).substr(2, 8),
       clean: true,
       connectTimeout: 10000,
       reconnectPeriod: 5000,
@@ -554,7 +554,7 @@ function App() {
             <div className="brand-mark w-9 h-9 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
               <img src="/pwa-icon.png" alt="ตราโรงเรียน" className="w-full h-full object-cover" />
             </div>
-            <div className="min-w-0"><span className="block font-bold text-gray-900 text-xs leading-tight">WATER LEVEL MONITORING SYSTEM WITH ESP32</span><span className="block text-xs text-gray-500 leading-snug mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</span></div>
+            <div className="min-w-0"><span className="block font-bold text-gray-900 text-lg leading-tight">SaltSense</span><span className="block text-xs text-gray-500 leading-snug mt-0.5">ระบบตรวจวัดระดับน้ำและความเค็ม เพื่อการบริหารจัดการนาเกลือ</span></div>
             <button type="button" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} className="sidebar-close ml-auto lg:hidden"><span aria-hidden="true">×</span></button>
           </div>
         </div>
@@ -611,7 +611,7 @@ function App() {
         </div>
 
         <div className="p-4 border-t border-gray-200 text-xs text-gray-400 text-center">
-          PSR · WATER LEVEL MONITORING SYSTEM WITH ESP32 © 2026
+          PSR · SaltSense © 2026
         </div>
       </div>
 
@@ -1104,8 +1104,9 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">เกี่ยวกับระบบ</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6 space-y-4">
                   <div>
-                    <p className="font-medium text-gray-900">WATER LEVEL MONITORING SYSTEM WITH ESP32</p>
-                    <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำ เพื่อการบริหารจัดการแปลงนาเกลือ</p>
+                    <p className="text-lg font-bold text-gray-900">SaltSense</p>
+                    <p className="text-sm text-gray-600 mt-1">Smart Salt Farm Water Level & Salinity Monitoring System</p>
+                    <p className="text-sm text-gray-600 mt-1">ระบบตรวจวัดระดับน้ำและความเค็ม เพื่อการบริหารจัดการนาเกลือ</p>
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-600">
@@ -1115,7 +1116,7 @@ function App() {
                   </div>
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-xs text-gray-500">เวอร์ชัน 1.0.0</p>
-                    <p className="text-xs text-gray-500 mt-1">PSR · WATER LEVEL MONITORING SYSTEM WITH ESP32 © 2026</p>
+                    <p className="text-xs text-gray-500 mt-1">PSR · SaltSense © 2026</p>
                   </div>
                 </div>
               </div>
