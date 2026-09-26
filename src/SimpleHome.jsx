@@ -1,7 +1,8 @@
 import { Volume2, Square, ChevronRight, WifiOff, CloudRain, Sun, Cloud, CloudLightning, CloudSun, CloudFog, Umbrella, Beaker, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { ADVICE_TONE, getDayAdvice } from './weather'
-import { SALINITY_STAGES, salinityForecastText, formatDay } from './salinity'
-import { useThaiSpeech, spokenTime } from './speech'
+import { SALINITY_STAGES, salinityForecastText } from './salinity'
+import { useThaiSpeech } from './speech'
+import { line, numberClips, dayClip, timeClip, CLIP_TEXT } from './voiceClips'
 
 const WEATHER_ICONS = { storm: CloudLightning, rain: CloudRain, fog: CloudFog, cloud: Cloud, partly: CloudSun, sun: Sun }
 
@@ -12,6 +13,7 @@ export default function SimpleHome({
 }) {
   const speech = useThaiSpeech()
   const p = speech.polite
+  const na = p === 'ค่ะ' ? 'คะ' : 'ครับ'
 
   let title
   let todo
@@ -20,20 +22,33 @@ export default function SimpleHome({
     title = isStale ? 'เซ็นเซอร์ไม่ส่งข้อมูล' : 'กำลังรอข้อมูล'
     todo = isStale ? 'ให้ตรวจไฟและ WiFi ที่กล่องเซ็นเซอร์' : 'รอสักครู่ ระบบกำลังเชื่อมต่อเซ็นเซอร์'
     say = isStale
-      ? [`ตอนนี้เซ็นเซอร์ไม่ส่งข้อมูลมาสักพักแล้ว${p}`, `ลองไปดูไฟกับไวไฟที่กล่องเซ็นเซอร์หน่อยนะ${p === 'ค่ะ' ? 'คะ' : 'ครับ'}`]
-      : [`ระบบกำลังเชื่อมต่อเซ็นเซอร์ รอสักครู่นะ${p === 'ค่ะ' ? 'คะ' : 'ครับ'}`]
+      ? [
+          line(`ตอนนี้เซ็นเซอร์ไม่ส่งข้อมูลมาสักพักแล้ว${p}`, ['w-stale-1']),
+          line(`ลองไปดูไฟกับไวไฟที่กล่องเซ็นเซอร์หน่อยนะ${na}`, ['w-stale-2']),
+        ]
+      : [line(`ระบบกำลังเชื่อมต่อเซ็นเซอร์ รอสักครู่นะ${na}`, ['w-wait'])]
   } else if (status === 'danger') {
     title = 'น้ำสูง อันตราย'
     todo = rainComing ? 'ระบายน้ำออกทันที ฝนกำลังจะมา' : 'ระบายน้ำออกทันที'
-    say = [`ตอนนี้น้ำในแปลงสูงมาก${p}`, rainComing ? `แล้วฝนก็กำลังจะมา ควรรีบระบายน้ำออกเลย${p}` : `ควรรีบระบายน้ำออกเลย${p}`]
+    say = [
+      line(`ตอนนี้น้ำในแปลงสูงมาก${p}`, ['w-danger']),
+      rainComing
+        ? line(`แล้วฝนก็กำลังจะมา ควรรีบระบายน้ำออกเลย${p}`, ['w-danger-rain'])
+        : line(`ควรรีบระบายน้ำออกเลย${p}`, ['w-danger-drain']),
+    ]
   } else if (status === 'warning') {
     title = 'น้ำเริ่มสูง'
     todo = rainComing ? 'พร่องน้ำออกบางส่วน ก่อนฝนตก' : 'คอยดูระดับน้ำใกล้ๆ'
-    say = [`น้ำในแปลงเริ่มสูงขึ้นแล้ว${p}`, rainComing ? `ถ้าพร่องน้ำออกก่อนฝนตกได้จะดี${p}` : `คอยดูระดับน้ำไว้หน่อยนะ${p === 'ค่ะ' ? 'คะ' : 'ครับ'}`]
+    say = [
+      line(`น้ำในแปลงเริ่มสูงขึ้นแล้ว${p}`, ['w-warning']),
+      rainComing
+        ? line(`ถ้าพร่องน้ำออกก่อนฝนตกได้จะดี${p}`, ['w-warning-rain'])
+        : line(`คอยดูระดับน้ำไว้หน่อยนะ${na}`, ['w-warning-watch']),
+    ]
   } else {
     title = 'น้ำปกติ'
     todo = 'ทำงานได้ตามปกติ'
-    say = [`ตอนนี้ระดับน้ำปกติดี${p}`]
+    say = [line(`ตอนนี้ระดับน้ำปกติดี${p}`, ['w-safe'])]
   }
 
   // บอกเป็น "เหลืออีกกี่ ซม. ถึงขีดอันตราย" เข้าใจง่ายกว่าระยะจากเซ็นเซอร์
@@ -44,7 +59,10 @@ export default function SimpleHome({
       ? 'น้ำเกินขีดอันตรายแล้ว'
       : `อีก ${margin} ซม. น้ำจะถึงขีดอันตราย`
   if (connected && margin !== null && margin > 0 && status !== 'safe') {
-    say.push(`อีกประมาณ ${Math.round(margin)} เซน น้ำจะถึงขีดอันตราย${p}`)
+    say.push(line(
+      `อีกประมาณ ${Math.round(margin)} เซน น้ำจะถึงขีดอันตราย${p}`,
+      ['w-margin-pre', ...numberClips(margin), 'u-cm', 'w-margin-post'],
+    ))
   }
 
   // ความเค็ม
@@ -52,13 +70,20 @@ export default function SimpleHome({
   const SaltIcon = salt.ready ? CheckCircle2 : salinityStage === 'bitter' ? AlertTriangle : Beaker
   const saltForecast = salinityForecastText(salinityStage, salinityPrediction, todayStr)
   const saltBe = Math.round(salinity.value)
-  if (salinityStage === 'ready') say.push(`ความเค็มตอนนี้ ${saltBe} ดีกรี กำลังพอดี เก็บเกลือได้แล้ว${p}`)
-  else if (salinityStage === 'high') say.push(`ความเค็มขึ้นไปถึง ${saltBe} ดีกรีแล้ว ควรรีบเก็บเกลือ${p}`)
-  else if (salinityStage === 'bitter') say.push(`ความเค็มสูงเกินไปแล้ว${p} น้ำเริ่มขม ควรระบายน้ำขมออก${p}`)
-  else {
+  const beClips = numberClips(saltBe)
+  if (salinityStage === 'ready') {
+    say.push(line(`ความเค็มตอนนี้ ${saltBe} ดีกรี กำลังพอดี เก็บเกลือได้แล้ว${p}`, ['s-now', ...beClips, 'u-degree', 's-ready-post']))
+  } else if (salinityStage === 'high') {
+    say.push(line(`ความเค็มขึ้นไปถึง ${saltBe} ดีกรี ควรรีบเก็บเกลือ${p}`, ['s-high-pre', ...beClips, 'u-degree', 's-high-post']))
+  } else if (salinityStage === 'bitter') {
+    say.push(line(`ความเค็มสูงเกินไปแล้ว${p} น้ำเริ่มขม ควรระบายน้ำขมออก${p}`, ['s-bitter']))
+  } else {
     const ready = salinityPrediction?.readyDay
-    say.push(`ความเค็มตอนนี้ ${saltBe} ดีกรี ยังไม่พร้อมเก็บ${p}`)
-    if (ready) say.push(`น่าจะพร้อมเก็บ${formatDay(ready.date, todayStr)}${p}`)
+    say.push(line(`ความเค็มตอนนี้ ${saltBe} ดีกรี ยังไม่พร้อมเก็บ${p}`, ['s-now', ...beClips, 'u-degree', 's-notready-post']))
+    if (ready) {
+      const day = dayClip(ready.date, todayStr)
+      say.push(line(`น่าจะพร้อมเก็บ${CLIP_TEXT[day]}${p}`, ['s-ready-when', day, 'p-krub']))
+    }
   }
 
   // อากาศ
@@ -71,17 +96,20 @@ export default function SimpleHome({
   const StatusIcon = connected ? config.icon : WifiOff
   if (advice && today) {
     if (advice.level === 'danger' || advice.level === 'warning') {
-      say.push(`วันนี้มีโอกาสฝนตก ${today.rainProb} เปอร์เซ็นต์${p}`)
-      if (weather.nextRain) say.push(`ฝนน่าจะเริ่มราว${spokenTime(weather.nextRain.time)}`)
-      say.push(`ควรเก็บเกลือขึ้นกอง แล้วคลุมผ้าใบไว้ก่อน${p}`)
+      say.push(line(`วันนี้มีโอกาสฝนตก ${today.rainProb} เปอร์เซ็นต์${p}`, ['r-today-pre', ...numberClips(today.rainProb), 'u-percent', 'p-krub']))
+      if (weather.nextRain) {
+        const t = timeClip(weather.nextRain.time)
+        say.push(line(`ฝนน่าจะเริ่มราว${CLIP_TEXT[t]}`, ['r-start', t]))
+      }
+      say.push(line(`ควรเก็บเกลือขึ้นกอง แล้วคลุมผ้าใบไว้ก่อน${p}`, ['r-cover']))
     } else if (advice.level === 'good') {
-      say.push(`วันนี้แดดดี เหมาะกับการตากเกลือ${p}`)
+      say.push(line(`วันนี้แดดดี เหมาะกับการตากเกลือ${p}`, ['r-good']))
     } else {
-      say.push(`วันนี้อากาศปกติ ฝนไม่น่าตก${p}`)
+      say.push(line(`วันนี้อากาศปกติ ฝนไม่น่าตก${p}`, ['r-normal']))
     }
   }
   if (tomorrow && tomorrowAdvice && (tomorrowAdvice.level === 'danger' || tomorrowAdvice.level === 'warning')) {
-    say.push(`ส่วนพรุ่งนี้ก็อาจมีฝนด้วย${p}`)
+    say.push(line(`ส่วนพรุ่งนี้ก็อาจมีฝนด้วย${p}`, ['r-tomorrow']))
   }
 
   return (

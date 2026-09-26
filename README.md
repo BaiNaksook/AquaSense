@@ -44,6 +44,16 @@ npm run dev                  # พัฒนา
 npm run build                # build → dist/
 ```
 
+## เสียงพูด (ปุ่ม "กดฟังเสียง")
+
+ใช้**เสียงคนจริงที่อัดไว้**ก่อน ประโยคไหนยังไม่มีไฟล์จะใช้เสียงอ่านอัตโนมัติของเครื่องแทน
+บทอัดเสียงและวิธีทำอยู่ที่ [docs/voice-recording.md](docs/voice-recording.md)
+
+```bash
+npm run voice:process   # ประมวลผลไฟล์ใน voice-raw/ → public/voice/*.mp3 (ต้องมี ffmpeg)
+npm run voice:script    # สร้างบทอัดเสียงใหม่ หลังแก้ src/voiceClips.js
+```
+
 ## Deploy บน Vercel
 
 ตั้งค่าไว้แล้วใน `vercel.json` (Vite → `dist/`, service worker ไม่ถูก cache ค้าง)

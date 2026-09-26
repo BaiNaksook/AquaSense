@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 
-// ===== เสียงอ่านให้ฟัง =====
-// ทำให้ไม่ฟังเป็นหุ่นยนต์: เลือกเสียงคุณภาพดีที่สุดในเครื่อง, พูดเป็นประโยคสั้นๆ มีช่วงหายใจ,
-// ใช้คำพูดแบบคนคุยกัน (หนึ่งทุ่ม / บ่ายสองโมง / ประมาณ 10 เซน) แทนการอ่านตัวเลขตรงๆ
+// ===== เสียงพูด: ใช้เสียงอัดจริงก่อน ถ้าไม่มีไฟล์ค่อยใช้เสียงอ่านอัตโนมัติ =====
+// ประโยค = { text, clips } — ถ้ามีไฟล์ครบทุก clip จะเล่นไฟล์ต่อกัน ไม่งั้นอ่าน text ด้วยเสียงเครื่อง
+
+const VOICE_BASE = `${import.meta.env?.BASE_URL ?? '/'}voice/`
+const SENTENCE_GAP_MS = 280
+const CLIP_GAP_MS = 30
 
 // เสียง neural ของ Edge/Windows, Google และ Apple ฟังเป็นธรรมชาติกว่าเสียงพื้นฐาน
 const VOICE_RANK = [/natural|online|neural/i, /premwadee|niwat/i, /google/i, /kanya|narisa/i]
@@ -17,72 +20,101 @@ function pickThaiVoice(voices) {
   return thai[0] ?? null
 }
 
-// เวลาแบบที่คนไทยพูด: 19:00 → "หนึ่งทุ่ม", 14:00 → "บ่ายสองโมง"
-const THAI_NUM = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า', 'สิบ', 'สิบเอ็ด']
-export function spokenTime(hhmm) {
-  const h = Number(hhmm.slice(0, 2))
-  if (h === 0) return 'เที่ยงคืน'
-  if (h <= 5) return `ตี${THAI_NUM[h]}`
-  if (h <= 11) return `${THAI_NUM[h]}โมงเช้า`
-  if (h === 12) return 'เที่ยง'
-  if (h === 13) return 'บ่ายโมง'
-  if (h <= 15) return `บ่าย${THAI_NUM[h - 12]}โมง`
-  if (h <= 17) return `${THAI_NUM[h - 12]}โมงเย็น`
-  return `${THAI_NUM[h - 18]}ทุ่ม`
+// โหลดรายชื่อไฟล์เสียงที่อัดไว้แล้ว (public/voice/manifest.json) ครั้งเดียวต่อการเปิดหน้า
+let manifestPromise = null
+function loadManifest() {
+  manifestPromise ??= fetch(`${VOICE_BASE}manifest.json`, { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : { clips: [] }))
+    .then((m) => new Set(m.clips ?? []))
+    .catch(() => new Set())
+  return manifestPromise
 }
 
 export function useThaiSpeech() {
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
   const [voice, setVoice] = useState(null)
+  const [recorded, setRecorded] = useState(() => new Set())
   const [speaking, setSpeaking] = useState(false)
-  const queueRef = useRef([])
+  const audioRef = useRef(null)
   const timerRef = useRef(null)
+  const runRef = useRef(0)
 
-  // รายชื่อเสียงโหลดช้าในบางเบราว์เซอร์ ต้องรอ voiceschanged
   useEffect(() => {
-    if (!supported) return
+    let alive = true
+    loadManifest().then((set) => { if (alive) setRecorded(set) })
+    if (!ttsSupported) return () => { alive = false }
     const synth = window.speechSynthesis
+    // รายชื่อเสียงโหลดช้าในบางเบราว์เซอร์ ต้องรอ voiceschanged
     const load = () => setVoice(pickThaiVoice(synth.getVoices()))
     load()
     synth.addEventListener?.('voiceschanged', load)
     return () => {
+      alive = false
       synth.removeEventListener?.('voiceschanged', load)
       synth.cancel()
-      clearTimeout(timerRef.current)
     }
-  }, [supported])
+  }, [ttsSupported])
 
-  // คำลงท้ายให้ตรงกับเสียง ผู้หญิง "ค่ะ" ผู้ชาย "ครับ"
-  const polite = voice && MALE_VOICES.test(voice.name) ? 'ครับ' : 'ค่ะ'
+  useEffect(() => () => {
+    clearTimeout(timerRef.current)
+    audioRef.current?.pause()
+  }, [])
+
+  const hasRecordings = recorded.size > 0
+  // คำลงท้าย: เสียงอัดจริงเป็นผู้ชาย "ครับ" / เสียงเครื่องส่วนใหญ่เป็นผู้หญิง "ค่ะ"
+  const polite = hasRecordings || (voice && MALE_VOICES.test(voice.name)) ? 'ครับ' : 'ค่ะ'
+  const supported = ttsSupported || hasRecordings
 
   const stop = () => {
-    if (!supported) return
-    queueRef.current = []
+    runRef.current += 1
     clearTimeout(timerRef.current)
-    window.speechSynthesis.cancel()
+    audioRef.current?.pause()
+    if (ttsSupported) window.speechSynthesis.cancel()
     setSpeaking(false)
   }
 
-  // พูดทีละประโยค เว้นช่วงสั้นๆ ระหว่างประโยคเหมือนคนพูด
-  const speak = (sentences) => {
-    if (!supported) return
+  const speak = (lines) => {
     stop()
-    queueRef.current = sentences.filter(Boolean)
-    const next = () => {
-      const text = queueRef.current.shift()
-      if (!text) { setSpeaking(false); return }
+    const run = runRef.current
+    const queue = lines.filter(Boolean)
+    // ใช้ <audio> ตัวเดียวตลอด — iOS อนุญาตให้เล่นต่อได้เพราะเริ่มจากการกดปุ่ม
+    audioRef.current ??= new Audio()
+    const audio = audioRef.current
+    const alive = () => runRef.current === run
+    const later = (fn, ms) => { timerRef.current = setTimeout(() => alive() && fn(), ms) }
+
+    const nextLine = () => {
+      const item = queue.shift()
+      if (!item) { setSpeaking(false); return }
+      const clips = item.clips ?? []
+      if (clips.length && clips.every((id) => recorded.has(id))) playClips([...clips])
+      else if (ttsSupported) sayText(item.text)
+      else later(nextLine, 0)
+    }
+
+    const playClips = (ids) => {
+      const id = ids.shift()
+      if (!id) { later(nextLine, SENTENCE_GAP_MS); return }
+      audio.onended = () => later(() => playClips(ids), CLIP_GAP_MS)
+      audio.onerror = () => later(() => playClips(ids), 0)
+      audio.src = `${VOICE_BASE}${id}.mp3`
+      audio.play().catch(() => later(() => playClips(ids), 0))
+    }
+
+    const sayText = (text) => {
       const u = new SpeechSynthesisUtterance(text)
       u.lang = 'th-TH'
       if (voice) u.voice = voice
       u.rate = 0.95
       u.pitch = 1.05
-      u.onend = () => { timerRef.current = setTimeout(next, 280) }
-      u.onerror = () => setSpeaking(false)
+      u.onend = () => later(nextLine, SENTENCE_GAP_MS)
+      u.onerror = () => later(nextLine, 0)
       window.speechSynthesis.speak(u)
     }
+
     setSpeaking(true)
-    next()
+    nextLine()
   }
 
-  return { supported, speaking, speak, stop, polite }
+  return { supported, speaking, speak, stop, polite, hasRecordings }
 }

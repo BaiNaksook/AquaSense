@@ -37,7 +37,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // รวมไฟล์เสียงพูด (public/voice) เพื่อให้กดฟังเสียงได้แม้ไม่มีเน็ต
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,mp3}', 'voice/manifest.json'],
         importScripts: ['sw-push.js'],
         runtimeCaching: [
           {
