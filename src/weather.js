@@ -167,35 +167,35 @@ export function getDayAdvice(day) {
     return {
       level: 'danger',
       title: 'ระวังพายุฝนฟ้าคะนอง',
-      advice: `ลมแรงถึง ${windText} กม./ชม. เก็บเกลือขึ้นกอง ยึดผ้าใบคลุมกองให้แน่น ตรวจคันนา และงดทำงานกลางแจ้งช่วงฟ้าคะนอง`,
+      advice: `รื้อเกลือขึ้นกอง มัดผ้าใบให้แน่น ฟ้าร้องให้หลบเข้าที่ร่ม (ลมแรง ${windText} กม./ชม.)`,
     }
   }
   if (rainMm >= RAIN_HEAVY_MM || tmdHeavy) {
     return {
       level: 'danger',
       title: 'คาดว่าฝนตกหนัก',
-      advice: `คาดฝน ${Math.round(rainMm)} มม. คลุมกองเกลือให้มิดชิด งดไขน้ำเชื้อเข้านาปลง และตรวจคันนา/ท่อระบายน้ำ`,
+      advice: `คลุมกองเกลือให้มิด อย่าเพิ่งไขน้ำเชื้อเข้านาปลง ดูคันนากับท่อ (ฝน ${Math.round(rainMm)} มม.)`,
     }
   }
   if (day.rainProb >= RAIN_ALERT_PROB || rainMm >= RAIN_ALERT_MM) {
     return {
       level: 'danger',
-      title: 'ฝนมีโอกาสตกสูง',
-      advice: `โอกาสฝน ${day.rainProb}% ควรรื้อเกลือที่ตกผลึกแล้วขึ้นกอง และคลุมกองเกลือไว้ก่อน`,
+      title: 'ฝนน่าจะตก',
+      advice: `รื้อเกลือขึ้นกองแล้วคลุมไว้ก่อน (ฝน ${day.rainProb}%)`,
     }
   }
   if (day.rainProb >= RAIN_WATCH_PROB || rainMm >= RAIN_WATCH_MM || tmdRain) {
     return {
       level: 'warning',
       title: 'อาจมีฝนตก',
-      advice: `${tmdRain && day.rainProb < RAIN_WATCH_PROB ? `กรมอุตุฯ คาดว่า${tmd}` : `โอกาสฝน ${day.rainProb}%`} เตรียมผ้าใบคลุมกองเกลือไว้ใกล้มือ และติดตามท้องฟ้า`,
+      advice: `เตรียมผ้าใบไว้ใกล้มือ คอยดูฟ้า (${tmdRain && day.rainProb < RAIN_WATCH_PROB ? `กรมอุตุฯ คาดว่า${tmd}` : `ฝน ${day.rainProb}%`})`,
     }
   }
   if (strongWind) {
     return {
       level: 'warning',
       title: 'ลมแรง',
-      advice: `ลมแรงถึง ${windText} กม./ชม. ยึดผ้าใบคลุมกองเกลือให้แน่น และระวังคลื่นกัดคันนา`,
+      advice: `มัดผ้าใบคลุมกองให้แน่น ระวังคลื่นกัดคันนา (ลม ${windText} กม./ชม.)`,
     }
   }
   if (
@@ -206,21 +206,21 @@ export function getDayAdvice(day) {
   ) {
     return {
       level: 'good',
-      title: 'เหมาะตากเกลือ',
-      advice: `แดดดี ลมดี ระเหยได้ประมาณ ${day.et0.toFixed(1)} มม. เหมาะตากน้ำ ไขน้ำเชื้อเข้านาปลง และรื้อเกลือ`,
+      title: 'แดดดี ตากเกลือได้',
+      advice: 'แดดดีลมดี ไขน้ำเชื้อเข้านาปลงได้ รื้อเกลือได้',
     }
   }
   if ((day.et0 !== null && day.et0 < POOR_ET0_MM) || (day.humidity ?? 0) > POOR_HUMIDITY) {
     return {
       level: 'poor',
-      title: 'น้ำระเหยช้า',
-      advice: 'อากาศชื้นหรือแดดน้อย น้ำระเหยช้า เกลือจะตกผลึกช้ากว่าปกติ',
+      title: 'แดดน้อย น้ำแห้งช้า',
+      advice: 'เกลือจะขึ้นช้ากว่าปกติหน่อย',
     }
   }
   return {
     level: 'normal',
     title: 'อากาศปกติ',
-    advice: 'ทำงานได้ตามปกติ น้ำระเหยปานกลาง',
+    advice: 'ทำนาได้ตามปกติ',
   }
 }
 

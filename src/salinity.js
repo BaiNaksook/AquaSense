@@ -16,24 +16,24 @@ export const BRINE_DEPTH_MM = Number(env.VITE_BRINE_DEPTH_MM) || 100
 
 export const SALINITY_STAGES = {
   low: {
-    label: 'น้ำยังเค็มน้อย', ready: false, color: 'var(--muted)',
-    advice: 'ช่วงนาตาก ปล่อยให้น้ำระเหยต่อ ยังไม่พร้อมเก็บ',
+    label: 'ยังเค็มไม่พอ', ready: false, color: 'var(--muted)',
+    advice: 'ตากน้ำต่อไป ยังเก็บไม่ได้',
   },
   rising: {
-    label: 'กำลังเข้มข้น', ready: false, color: 'var(--primary)',
-    advice: 'ใกล้แล้ว เตรียมไขน้ำเชื้อเข้านาปลง ยังไม่พร้อมเก็บ',
+    label: 'ใกล้แล้ว', ready: false, color: 'var(--primary)',
+    advice: 'เตรียมไขน้ำเชื้อเข้านาปลง ยังเก็บไม่ได้',
   },
   ready: {
-    label: 'เหมาะสม พร้อมเก็บ', ready: true, color: 'var(--safe)',
-    advice: 'ความเค็มเหมาะสม เกลือกำลังตกผลึก เก็บได้เมื่อผลึกหนาพอ',
+    label: 'พร้อมเก็บ', ready: true, color: 'var(--accent)',
+    advice: 'เกลือกำลังขึ้น รอเม็ดหนาแล้วรื้อได้',
   },
   high: {
-    label: 'เข้มข้นสูง ควรเร่งเก็บ', ready: true, color: 'var(--warning)',
-    advice: 'ควรเร่งรื้อเกลือ ก่อนน้ำกลายเป็นน้ำขม',
+    label: 'รีบเก็บ', ready: true, color: 'var(--warning)',
+    advice: 'รีบรื้อเกลือ ก่อนน้ำกลายเป็นน้ำขม',
   },
   bitter: {
-    label: 'น้ำขม', ready: false, color: 'var(--danger)',
-    advice: 'ระบายน้ำขมออก เพราะทำให้เกลือขมและคุณภาพลดลง',
+    label: 'น้ำขมแล้ว', ready: false, color: 'var(--danger)',
+    advice: 'ปล่อยน้ำขมทิ้ง ไม่งั้นเกลือจะขม',
   },
 }
 
@@ -89,7 +89,7 @@ export function salinityForecastText(stageKey, prediction, todayStr) {
   if (stageKey === 'low' || stageKey === 'rising') {
     parts.push(readyDay
       ? `คาดว่าจะพร้อมเก็บ${formatDay(readyDay.date, todayStr) === 'วันนี้' ? 'ภายในวันนี้' : ` ${formatDay(readyDay.date, todayStr)}`}`
-      : 'ยังไม่ถึงระดับเหมาะสมภายใน 7 วัน')
+      : 'อีก 7 วันก็ยังไม่ถึงเวลาเก็บ')
   } else if (stageKey === 'ready' || stageKey === 'high') {
     parts.push(bitterDay ? `ควรเก็บให้เสร็จก่อน ${formatDay(bitterDay.date, todayStr)}` : 'ความเค็มจะอยู่ในช่วงเหมาะสมต่อเนื่อง')
   }

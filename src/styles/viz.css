@@ -1,0 +1,158 @@
+/* ============================================================
+   ภาพข้อมูล: WaterPan (.wp-) · SaltMeter (.sm-)
+   สีจาก token ใน index.css เท่านั้น
+   ============================================================ */
+
+/* ---------- WaterPan: ภาพตัดขวางนาเกลือ ---------- */
+.wp {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 190px;
+  overflow: visible;
+  --wp-line: var(--border-strong);
+  --wp-ink: var(--fg);
+  --wp-water: var(--water);
+  --wp-danger: var(--danger);
+  --wp-warn: var(--warning);
+  --wp-halo: var(--surface);
+}
+.wp--dark {
+  --wp-line: var(--on-danger);
+  --wp-ink: var(--on-danger);
+  --wp-water: var(--on-danger);
+  --wp-danger: var(--on-danger);
+  --wp-warn: var(--on-danger);
+  --wp-halo: var(--danger);
+}
+
+.wp-bund {
+  fill: var(--wp-line);
+  fill-opacity: .35;
+  stroke: var(--wp-line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.wp-floor { stroke: var(--wp-line); stroke-width: 3; stroke-linecap: round; }
+
+.wp-water {
+  transition: transform 400ms var(--ease);
+}
+.wp-water__body { fill: var(--wp-water); fill-opacity: .55; }
+.wp--dark .wp-water__body { fill-opacity: .4; }
+.wp-water__surface { fill: none; stroke: var(--wp-water); stroke-width: 3; }
+
+/* ค่าเก่า: ลายเส้นทแยงและจางลง */
+.wp-hatch-bg { fill: var(--wp-water); fill-opacity: .15; }
+.wp-hatch-line { stroke: var(--wp-water); stroke-width: 2; stroke-opacity: .7; }
+.wp--stale .wp-water__body { fill-opacity: 1; }
+.wp--stale .wp-water { opacity: .7; }
+.wp--stale .wp-water__surface { stroke-dasharray: 6 5; }
+
+.wp-line { fill: none; stroke-linecap: butt; }
+.wp-line--danger { stroke: var(--wp-danger); stroke-width: 3; stroke-dasharray: 10 6; }
+.wp-line--warn { stroke: var(--wp-warn); stroke-width: 2; stroke-dasharray: 6 6; }
+.wp--dark .wp-line--warn { stroke-opacity: .75; }
+
+.wp-label {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--wp-ink);
+  /* ขอบสีพื้นรอบตัวหนังสือ ให้อ่านได้แม้ทับน้ำ */
+  paint-order: stroke;
+  stroke: var(--wp-halo);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.wp-label--danger { fill: var(--wp-danger); }
+.wp-label--warn { fill: var(--wp-warn); font-weight: 600; }
+.wp-label--stale { fill: var(--wp-ink); font-weight: 600; }
+
+.wp-empty {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  fill: var(--muted);
+}
+.wp--dark .wp-empty { fill: var(--on-danger); }
+
+/* ---------- SaltMeter: มาตรความเค็ม 3 ช่วง ---------- */
+.sm {
+  --sm-track-h: 20px;
+  --sm-ready-h: 30px;
+  width: 100%;
+  color: var(--fg);
+}
+.sm--compact { --sm-track-h: 12px; --sm-ready-h: 18px; }
+
+.sm-head { position: relative; height: 40px; }
+.sm--compact .sm-head { height: 32px; }
+
+.sm-pointer {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  transition: left 180ms var(--ease);
+  white-space: nowrap;
+}
+.sm-pointer__value {
+  font-size: var(--fs-label);
+  font-weight: 700;
+  line-height: 1.3;
+  padding-bottom: 2px;
+}
+.sm--compact .sm-pointer__value { font-size: var(--fs-small); }
+.sm-pointer__tri {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid var(--fg);
+}
+/* ใกล้ขอบ: ย้ายป้ายให้ชิดด้านใน แต่ปลายสามเหลี่ยมยังชี้ตรงค่า */
+.sm-pointer--start { transform: translateX(-8px); align-items: flex-start; }
+.sm-pointer--end { transform: translateX(calc(-100% + 8px)); align-items: flex-end; }
+
+.sm-track {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--sm-ready-h);
+}
+.sm-zone {
+  flex-grow: 0;
+  flex-shrink: 1;
+  height: var(--sm-track-h);
+  border-radius: 4px;
+}
+.sm-zone--low {
+  background: color-mix(in srgb, var(--primary) 22%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, var(--primary) 45%, var(--surface));
+}
+.sm-zone--ready { height: var(--sm-ready-h); background: var(--accent); }
+.sm-zone--bitter { background: var(--danger); }
+
+.sm-labels { display: flex; gap: 2px; margin-top: var(--space-2); }
+.sm-label {
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.sm-label.is-current { color: var(--fg); font-weight: 700; }
+.sm-label--ready,
+.sm-label--ready.is-current { color: var(--accent); font-weight: 700; }
+.sm-label--bitter.is-current { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wp-water,
+  .sm-pointer { transition: none; }
+}

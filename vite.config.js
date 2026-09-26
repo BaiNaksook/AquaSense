@@ -15,8 +15,8 @@ export default defineConfig({
         // short_name คือชื่อใต้ไอคอนตอนติดตั้งเป็นแอป ต้องสั้น ไม่งั้นถูกตัดกลางคำ
         short_name: 'SaltSense',
         description: 'ระบบตรวจวัดระดับน้ำและความเค็ม เพื่อการบริหารจัดการนาเกลือ ด้วย ESP32',
-        theme_color: '#3b82f6',
-        background_color: '#f9fafb',
+        theme_color: '#f4f4f1',
+        background_color: '#f4f4f1',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
