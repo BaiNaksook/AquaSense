@@ -1,0 +1,144 @@
+/* ============================================================
+   หน้า "7 วัน" (WeekPage) · อากาศวันนี้ (WeatherPanel) · ความเค็ม (SalinityCard)
+   prefix: .wk- .wx- .sc-   — ปกติ = สงบ, สีเฉพาะวันที่ต้องลงมือ
+   ============================================================ */
+
+/* ---------- โครงหน้า ---------- */
+.wk { display: grid; gap: var(--space-3); max-width: 960px; margin: 0 auto; }
+.wk-detail { display: grid; gap: var(--space-3); align-items: start; }
+@media (min-width: 900px) {
+  .wk-detail { grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+}
+.wk-foot { margin: 0; font-size: var(--fs-small); line-height: 1.5; text-align: center; }
+
+/* ---------- ประโยคสรุป ---------- */
+.wk-summary { padding: var(--space-4); display: grid; gap: var(--space-1); }
+.wk-summary__label { margin: 0; font-size: var(--fs-label); color: var(--muted); line-height: 1.4; }
+.wk-summary__text { margin: 0; font-size: var(--fs-lead); font-weight: 800; line-height: 1.45; }
+.wk-summary[data-tone="accent"] { border-color: var(--accent); border-width: 2.5px; }
+.wk-summary[data-tone="accent"] .wk-summary__text { color: var(--accent); }
+.wk-summary[data-tone="warning"] { border-color: var(--warning); border-width: 2.5px; }
+.wk-summary[data-tone="warning"] .wk-summary__text { color: var(--warning); }
+.wk-summary[data-tone="rain"] { border-color: var(--primary); border-width: 2.5px; }
+.wk-summary[data-tone="rain"] .wk-summary__text { color: var(--primary); }
+
+/* ---------- ปฏิทินเก็บเกลือ (แถวแนวตั้ง) ---------- */
+.wk-cal { padding: var(--space-4); display: grid; gap: var(--space-3); }
+.wk-cal__empty, .wk-cal__note { margin: 0; font-size: var(--fs-small); line-height: 1.5; }
+.wk-cal__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.wk-cal__head { display: none; }
+
+.wk-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "day verdict"
+    "wx  be";
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.wk-row__day { grid-area: day; font-size: var(--fs-body); font-weight: 700; line-height: 1.4; }
+.wk-row__wx {
+  grid-area: wx;
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-label); line-height: 1.4;
+}
+.wk-row__wxicon { width: 28px; height: 28px; flex: none; color: var(--muted); }
+.wk-row__wxtext { display: block; font-size: var(--fs-small); color: var(--muted); }
+.wk-row__be { grid-area: be; font-size: var(--fs-label); text-align: right; white-space: nowrap; }
+.wk-row__be .num { font-size: var(--fs-lead); font-weight: 700; }
+.wk-row__verdict {
+  grid-area: verdict;
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  font-size: var(--fs-body); font-weight: 700; line-height: 1.35; text-align: right;
+  color: var(--muted);
+}
+.wk-row__vicon { width: 28px; height: 28px; flex: none; }
+
+/* สีเฉพาะวันที่ต้องลงมือ */
+.wk-row[data-tone="accent"] { border-color: var(--accent); border-width: 2.5px; }
+.wk-row[data-tone="accent"] .wk-row__verdict { color: var(--accent); }
+.wk-row[data-tone="warning"] { border-color: var(--warning); border-width: 2.5px; }
+.wk-row[data-tone="warning"] .wk-row__verdict { color: var(--warning); }
+/* ฝน = สีน้ำเค็ม ไม่ใช่สีแดง (แดงสงวนไว้ให้น้ำในนาสูงอันตราย) */
+.wk-row[data-tone="rain"] { border-color: var(--primary); border-width: 2.5px; }
+.wk-row[data-tone="rain"] .wk-row__verdict, .wk-row[data-tone="rain"] .wk-row__wxicon { color: var(--primary); }
+
+@media (min-width: 640px) {
+  .wk-cal__head, .wk-row {
+    grid-template-columns: 7.5rem 1fr 7.5rem 12rem;
+    grid-template-areas: "day wx be verdict";
+  }
+  .wk-cal__head {
+    display: grid; gap: var(--space-3); padding: 0 var(--space-3);
+    font-size: var(--fs-small); color: var(--muted);
+  }
+  .wk-cal__head span:nth-child(3) { text-align: right; }
+  .wk-cal__head span:nth-child(4) { text-align: right; }
+}
+
+/* ---------- อากาศวันนี้ ---------- */
+.wx { padding: var(--space-4); display: grid; gap: var(--space-3); }
+.wx[data-level="warning"] { border-color: var(--warning); border-width: 2.5px; --tone: var(--warning); }
+.wx[data-level="danger"] { border-color: var(--primary); border-width: 2.5px; --tone: var(--primary); }
+.wx-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.wx-refresh { padding: 0 var(--space-3); }
+.wx-refresh:disabled { opacity: .7; cursor: default; }
+.wx-refresh__icon { width: 20px; height: 20px; }
+.wx-refresh__icon.is-spinning { animation: wx-spin 1s linear 3; }
+@keyframes wx-spin { to { transform: rotate(360deg); } }
+
+.wx-text { margin: 0; font-size: var(--fs-body); line-height: 1.55; }
+.wx-advice { display: flex; align-items: flex-start; gap: var(--space-3); }
+.wx-advice__icon { width: 36px; height: 36px; flex: none; color: var(--tone, var(--fg)); }
+.wx-advice__title { margin: 0; font-size: var(--fs-lead); font-weight: 800; line-height: 1.4; color: var(--tone, var(--fg)); }
+
+.wx-next {
+  margin: 0; display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-body); font-weight: 700; line-height: 1.45;
+}
+.wx-next__icon { width: 24px; height: 24px; flex: none; }
+
+.wx-sky { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-label); line-height: 1.4; }
+.wx-sky__icon { width: 28px; height: 28px; flex: none; color: var(--muted); }
+
+.wx-facts {
+  margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);
+}
+.wx-fact { padding: var(--space-3); background: var(--surface-2); border-radius: var(--radius); display: grid; gap: 2px; }
+.wx-fact dt { font-size: var(--fs-small); color: var(--muted); line-height: 1.4; }
+.wx-fact dd { margin: 0; display: grid; gap: 2px; }
+.wx-fact__word { font-size: var(--fs-label); font-weight: 700; line-height: 1.4; }
+.wx-fact__value { font-size: var(--fs-small); color: var(--muted); line-height: 1.4; }
+
+.wx-season { margin: 0; font-size: var(--fs-small); line-height: 1.5; padding-top: var(--space-2); border-top: 1.5px solid var(--border); }
+.wx-stale { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-label); font-weight: 600; color: var(--warning); line-height: 1.4; }
+.wx-stale__icon { width: 22px; height: 22px; flex: none; }
+.wx-offline { display: flex; align-items: flex-start; gap: var(--space-3); }
+.wx-offline__icon { width: 32px; height: 32px; flex: none; color: var(--warning); }
+
+/* ---------- ความเค็มในนาปลง ---------- */
+.sc { padding: var(--space-4); display: grid; gap: var(--space-3); --tone: var(--fg); }
+.sc[data-tone="accent"] { border-color: var(--accent); border-width: 2.5px; --tone: var(--accent); }
+.sc[data-tone="warning"] { border-color: var(--warning); border-width: 2.5px; --tone: var(--warning); }
+.sc-main { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.sc-value { margin: 0; display: flex; align-items: baseline; gap: var(--space-2); }
+.sc-value .num { font-size: var(--fs-hero); font-weight: 800; }
+.sc-value__unit { font-size: var(--fs-lead); font-weight: 700; }
+.sc-stage {
+  margin: 0; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-lead); font-weight: 800; line-height: 1.4; color: var(--tone);
+}
+.sc-stage__icon { width: 32px; height: 32px; flex: none; }
+.sc-text { margin: 0; font-size: var(--fs-body); line-height: 1.55; }
+.sc-forecast {
+  margin: 0; display: flex; align-items: flex-start; gap: var(--space-2);
+  font-size: var(--fs-body); font-weight: 600; line-height: 1.5;
+  padding-top: var(--space-3); border-top: 1.5px solid var(--border);
+}
+.sc-forecast__icon { width: 24px; height: 24px; flex: none; margin-top: 2px; }
+.sc-demo { margin: 0; font-size: var(--fs-small); line-height: 1.5; }

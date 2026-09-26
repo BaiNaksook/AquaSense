@@ -1,5 +1,5 @@
 {
-  "name": "dashboard",
+  "name": "saltsense",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,20 +12,16 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "vite preview --host 0.0.0.0 --port 10000",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "voice:script": "node scripts/voice-script.mjs",
+    "voice:process": "node scripts/process-voice.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "framer-motion": "^12.42.0",
-    "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
     "mqtt": "^5.15.1",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "react-leaflet": "^5.0.0",
-    "tailwind-merge": "^3.6.0"
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

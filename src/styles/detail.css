@@ -1,0 +1,127 @@
+/* ============================================================
+   หน้า "ข้อมูลละเอียด" (DetailPage) และกราฟ (WaterChart)
+   ปกติ = สงบ, ผิดปกติ = มีสี — ดู docs/design-system.md
+   ============================================================ */
+.dt { display: grid; gap: var(--space-4); max-width: 1280px; margin: 0 auto; }
+.dt-head { margin-bottom: 0; }
+.dt-head__sub { margin: 0; font-size: var(--fs-label); line-height: 1.4; }
+
+.dt-row { display: grid; gap: var(--space-4); }
+@media (min-width: 900px) {
+  .dt-row--main { grid-template-columns: minmax(300px, 1fr) 2fr; align-items: start; }
+  .dt-row--pair { grid-template-columns: 1fr 1fr; align-items: start; }
+}
+.dt-slot { min-width: 0; }
+
+/* ---- สรุปน้ำ ---- */
+.dt-sum { padding: var(--space-4); display: grid; gap: var(--space-3); --tone: var(--fg); }
+.dt-sum[data-state="safe"] { --tone: var(--safe); }
+.dt-sum[data-state="unknown"] { --tone: var(--muted); }
+.dt-sum[data-state="warning"] { --tone: var(--warning); border-color: var(--warning); border-width: 2.5px; }
+.dt-sum[data-state="danger"] { --tone: var(--danger); border-color: var(--danger); border-width: 2.5px; }
+
+.dt-sum__status {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin: 0; font-size: var(--fs-title); font-weight: 800; line-height: 1.35;
+  color: var(--tone);
+}
+.dt-sum__status svg { width: 36px; height: 36px; flex: none; }
+/* อันตราย: ป้ายแดงทึบ ตัวขาว */
+.dt-sum[data-state="danger"] .dt-sum__status {
+  background: var(--danger); color: var(--on-danger);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius);
+}
+
+.dt-sum__margin { margin: 0; font-size: var(--fs-body); line-height: 1.4; display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.dt-sum__margin .num { font-size: var(--fs-hero); font-weight: 800; }
+.dt-sum[data-state="danger"] .dt-sum__margin .num { color: var(--danger); }
+.dt-sum__margin--none { color: var(--muted); }
+
+.dt-facts { margin: 0; display: grid; gap: 0; border-top: 1.5px solid var(--border); }
+.dt-facts > div {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);
+  padding: var(--space-2) 0; border-bottom: 1.5px solid var(--border);
+}
+.dt-facts dt { font-size: var(--fs-label); color: var(--muted); line-height: 1.4; }
+.dt-facts dd { margin: 0; font-size: var(--fs-label); font-weight: 600; line-height: 1.4; text-align: right; }
+.dt-facts dd[data-weak] { color: var(--warning); }
+.dt-trend { display: inline-flex; align-items: center; gap: 6px; }
+.dt-trend svg { width: 20px; height: 20px; flex: none; }
+
+.dt-sum__alert {
+  display: flex; align-items: center; gap: var(--space-2); margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--warning); border-radius: var(--radius);
+  font-size: var(--fs-label); font-weight: 700; line-height: 1.4; color: var(--warning);
+}
+.dt-sum__alert svg { width: 24px; height: 24px; flex: none; }
+.dt-sum__stale { margin: 0; font-size: var(--fs-label); font-weight: 700; line-height: 1.5; color: var(--warning); }
+
+/* ---- กล่องกราฟ ---- */
+.dt-chart { padding: var(--space-4); display: grid; gap: var(--space-3); min-width: 0; }
+.dt-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.dt-chart__count { font-size: var(--fs-label); }
+
+/* ---- เกณฑ์ ---- */
+.dt-legend { padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
+.dt-legend__title { margin: 0; font-size: var(--fs-label); font-weight: 700; line-height: 1.4; }
+.dt-legend__list { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.dt-legend__list > div { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-label); line-height: 1.4; }
+.dt-legend__list dt { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.dt-legend__list dt svg { width: 20px; height: 20px; flex: none; }
+.dt-legend__list dd { margin: 0; }
+.dt-legend__list [data-state="safe"] dt { color: var(--fg); }
+.dt-legend__list [data-state="warning"] dt { color: var(--warning); }
+.dt-legend__list [data-state="danger"] dt { color: var(--danger); }
+.dt-legend__note { margin: 0; font-size: var(--fs-small); line-height: 1.5; }
+
+/* ============================================================
+   WaterChart — .wc-
+   ============================================================ */
+.wc { position: relative; min-width: 0; }
+.wc__svg {
+  display: block; width: 100%; height: auto;
+  touch-action: pan-y; /* เลื่อนหน้าขึ้นลงได้ ลากแนวนอนเพื่อดูค่า */
+  user-select: none; -webkit-user-select: none;
+}
+.wc--empty {
+  display: grid; place-items: center; min-height: 200px;
+  padding: var(--space-5); text-align: center;
+  background: var(--surface-2); border-radius: var(--radius);
+}
+.wc--empty p { margin: 0; font-size: var(--fs-label); color: var(--muted); line-height: 1.5; }
+
+.wc__band--danger { fill: var(--danger); fill-opacity: .1; }
+.wc__band--warning { fill: var(--warning); fill-opacity: .1; }
+.wc__grid { stroke: var(--border); stroke-width: 1; }
+.wc__axis { stroke: var(--border-strong); stroke-width: 1.5; }
+.wc__rule { stroke-width: 1.5; stroke-dasharray: 6 4; }
+.wc__rule--danger { stroke: var(--danger); }
+.wc__rule--warning { stroke: var(--warning); }
+.wc__tick { fill: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.wc__rulelabel { font-size: 14px; font-weight: 700; }
+.wc__rulelabel--danger { fill: var(--danger); }
+.wc__rulelabel--warning { fill: var(--warning); }
+
+.wc__line { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.wc__last { fill: var(--primary); stroke: var(--surface); stroke-width: 2; }
+.wc__lastlabel { fill: var(--fg); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+
+.wc__cursor line { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 3 3; }
+.wc__cursor circle { fill: var(--surface); stroke: var(--fg); stroke-width: 2; }
+
+.wc__tip {
+  position: absolute; z-index: 2; pointer-events: none;
+  transform: translate(-50%, calc(-100% - 14px));
+  display: grid; gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface); color: var(--fg);
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius);
+  font-size: var(--fs-label); line-height: 1.4; white-space: nowrap;
+}
+.wc__tip--below { transform: translate(-50%, 14px); }
+.wc__tip span { color: var(--muted); }
+.wc__tip strong { font-weight: 700; }
+.wc__tip strong span { color: inherit; }
+
+.wc__caption { margin: var(--space-2) 0 0; font-size: var(--fs-small); line-height: 1.5; }

@@ -28,3 +28,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ไฟล์เสียงดิบก่อนประมวลผล (ผลลัพธ์อยู่ใน public/voice)
+voice-raw/
