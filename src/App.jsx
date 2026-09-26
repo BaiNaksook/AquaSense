@@ -4,6 +4,7 @@ import { AlertTriangle, ShieldCheck, Radio, Home, Bell, Settings, Info, Zap, Sun
 import mqtt from 'mqtt'
 import { supabase } from './supabase'
 import WeatherPanel from './WeatherPanel'
+import SimpleHome from './SimpleHome'
 import { useWeather, ADVICE_TONE } from './weather'
 
 // ===== MQTT Config =====
@@ -253,6 +254,13 @@ function App() {
   const [soundOn, setSoundOn] = useState(true)
   const [history, setHistory] = useState([])
   const [currentPage, setCurrentPage] = useState('home')
+  // โหมดง่าย (ค่าเริ่มต้น) สำหรับเกษตรกร / โหมดละเอียด สำหรับครู ผู้ดูแลระบบ
+  const [viewMode, setViewMode] = useState(() => (storageGet('viewMode') === 'detail' ? 'detail' : 'simple'))
+  const changeViewMode = (mode) => {
+    setViewMode(mode)
+    storageSet('viewMode', mode)
+    window.scrollTo?.(0, 0)
+  }
   const [chartHoverPoint, setChartHoverPoint] = useState(null)
   const [chartMousePos, setChartMousePos] = useState({ x: 0, y: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -702,8 +710,26 @@ function App() {
               )}
             </AnimatePresence>
             {/* Home Page */}
-            {currentPage === 'home' && (
+            {currentPage === 'home' && viewMode === 'simple' && (
+              <SimpleHome
+                status={status}
+                config={config}
+                connected={connected}
+                isStale={isStale}
+                distance={distance}
+                redMax={RED_MAX}
+                lastUpdated={lastUpdated}
+                weather={weather}
+                rainComing={rainComing}
+                onShowDetail={() => changeViewMode('detail')}
+              />
+            )}
+
+            {currentPage === 'home' && viewMode === 'detail' && (
               <>
+                <button type="button" className="simple-back" onClick={() => changeViewMode('simple')}>
+                  ← กลับหน้าแบบง่าย
+                </button>
                 {action && (
                   <div className="action-banner" style={{ '--tone': action.tone }} role={action.tone === 'var(--danger)' ? 'alert' : undefined}>
                     <action.icon className="w-8 h-8 flex-shrink-0" aria-hidden="true" />
@@ -1064,6 +1090,19 @@ function App() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">ตั้งค่า</h2>
                 <div className="rounded-lg border bg-white p-4 sm:p-6">
                   <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
+                      <div>
+                        <p className="font-medium text-gray-900">หน้าแรก</p>
+                        <p className="text-sm text-gray-500">แบบง่าย: บอกแค่สถานะน้ำ สิ่งที่ต้องทำ และอากาศวันนี้</p>
+                      </div>
+                      <button
+                        onClick={() => changeViewMode(viewMode === 'simple' ? 'detail' : 'simple')}
+                        className="px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      >
+                        {viewMode === 'simple' ? 'แบบง่าย' : 'แบบละเอียด'}
+                      </button>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-gray-200">
                       <div>
                         <p className="font-medium text-gray-900">ธีมหน้าจอ</p>
