@@ -461,6 +461,70 @@ nav .bg-blue-50::before {
 }
 .simple-back { min-height: 44px; margin-bottom: 16px; justify-content: flex-start; width: fit-content; }
 
+.simple-salt {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  border-left: 8px solid var(--tone);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.simple-salt__head { display: flex; align-items: center; gap: 14px; color: var(--tone); }
+.simple-salt__head > div { flex: 1; min-width: 0; }
+.simple-salt__title { font-size: 1.4rem; font-weight: 800; line-height: 1.3; color: var(--tone); }
+.simple-salt__demo { font-size: .85rem; color: var(--muted); }
+
+/* ============================================================
+   Salinity card — ความเข้มข้นน้ำเกลือ
+   ============================================================ */
+.salt-demo-badge {
+  flex: none; padding: 4px 10px; border-radius: 999px;
+  font-size: .75rem; font-weight: 700;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+}
+.salt-main { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 16px 0 12px; }
+.salt-value { display: flex; align-items: baseline; gap: 6px; color: var(--tone); }
+.salt-value__num { font-size: clamp(2.6rem, 7vw, 3.4rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.salt-value__unit { font-size: 1.1rem; font-weight: 600; color: var(--muted); }
+.salt-stage { flex: 1; min-width: 200px; }
+.salt-stage__label { display: flex; align-items: center; gap: 6px; font-size: 1.15rem; font-weight: 700; color: var(--tone); }
+.salt-stage__advice { font-size: .95rem; line-height: 1.6; color: var(--fg); margin-top: 2px; }
+.salt-scale { margin: 6px 0 4px; }
+.salt-scale__track { position: relative; height: 14px; border-radius: 7px; overflow: visible; background: var(--surface-2); }
+.salt-scale__track span { position: absolute; top: 0; bottom: 0; }
+.salt-scale__track span:first-child { border-radius: 7px 0 0 7px; }
+.salt-scale__track span:nth-last-child(2) { border-radius: 0 7px 7px 0; }
+.salt-scale__marker {
+  position: absolute; top: -5px; width: 6px; height: 24px; margin-left: -3px;
+  border-radius: 3px; background: var(--fg); box-shadow: 0 0 0 2px var(--surface);
+}
+.salt-scale__labels { position: relative; height: 18px; margin-top: 4px; font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.salt-scale__labels span { position: absolute; transform: translateX(-50%); }
+.salt-forecast {
+  display: flex; gap: 8px; align-items: flex-start;
+  margin-top: 12px; padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: .95rem; font-weight: 600; line-height: 1.5;
+  color: var(--fg); background: var(--surface-2);
+}
+.salt-days {
+  display: grid; grid-template-columns: repeat(7, minmax(64px, 1fr)); gap: 6px;
+  margin: 12px 0 0; padding: 0 0 4px; list-style: none; overflow-x: auto;
+}
+.salt-days li {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 4px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted);
+}
+.salt-days li.is-ready { border-color: color-mix(in srgb, var(--safe) 50%, transparent); background: color-mix(in srgb, var(--safe) 8%, var(--surface)); color: var(--safe); }
+.salt-days li.is-bitter { border-color: color-mix(in srgb, var(--danger) 50%, transparent); color: var(--danger); }
+.salt-days__name { font-size: .78rem; font-weight: 600; }
+.salt-days__be { font-size: 1rem; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+
 /* ============================================================
    Weather card
    ============================================================ */

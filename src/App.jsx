@@ -5,6 +5,8 @@ import mqtt from 'mqtt'
 import { supabase } from './supabase'
 import WeatherPanel from './WeatherPanel'
 import SimpleHome from './SimpleHome'
+import SalinityCard from './SalinityCard'
+import { getSalinityStage, predictSalinity, simulateSalinity } from './salinity'
 import { useWeather, ADVICE_TONE } from './weather'
 
 // ===== MQTT Config =====
@@ -251,6 +253,9 @@ function App() {
   const [mqttStatus, setMqttStatus] = useState('connecting')
   const [lastUpdated, setLastUpdated] = useState('')
   const weather = useWeather()
+  // ความเค็ม (°Bé): ใช้ค่าจาก ESP32 ถ้าส่ง `salinity` มา ไม่งั้นใช้ค่าจำลองจนกว่าจะติดเซนเซอร์
+  const [salinity, setSalinity] = useState(() => ({ value: simulateSalinity(), simulated: true }))
+  const lastRealSalinityRef = useRef(null)
   const [soundOn, setSoundOn] = useState(true)
   const [history, setHistory] = useState([])
   const [currentPage, setCurrentPage] = useState('home')
@@ -300,6 +305,16 @@ function App() {
       document.body.style.overflow = ''
     }
   }, [sidebarOpen])
+
+  // ค่าความเค็มจำลอง — หยุดเองเมื่อมีค่าจริงจากเซนเซอร์ภายใน 1 นาทีล่าสุด
+  useEffect(() => {
+    const id = setInterval(() => {
+      const real = lastRealSalinityRef.current
+      if (real !== null && Date.now() - real < 60000) return
+      setSalinity({ value: simulateSalinity(), simulated: true })
+    }, 10000)
+    return () => clearInterval(id)
+  }, [])
 
   // นับเวลาตั้งแต่ได้ข้อมูลล่าสุด — เงียบนานเกินไปคือขาดการเชื่อมต่อ
   useEffect(() => {
@@ -389,7 +404,7 @@ function App() {
     client.on('message', (_topic, message) => {
       const payload = message.toString().trim()
       const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null)
-      const { d, rssi: incomingRssi, water, rise, rapid } = (() => {
+      const { d, rssi: incomingRssi, water, rise, rapid, salt } = (() => {
         try {
           const obj = JSON.parse(payload)
           if (obj !== null && typeof obj === 'object' && typeof obj.distance === 'number') {
@@ -399,12 +414,17 @@ function App() {
               water: num(obj.water),          // ระดับน้ำจริง (ถ้า Arduino ตั้ง HEIGHT ไว้)
               rise: num(obj.rise),            // อัตราน้ำขึ้น ซม./นาที
               rapid: obj.rapid === 1 || obj.rapid === true,
+              salt: num(obj.salinity),        // ความเค็ม °Bé (เมื่อติดเซนเซอร์แล้ว)
             }
           }
         } catch { /* plain number */ }
-        return { d: parseFloat(payload), rssi: null, water: null, rise: null, rapid: false }
+        return { d: parseFloat(payload), rssi: null, water: null, rise: null, rapid: false, salt: null }
       })()
       if (incomingRssi !== null) setRssi(incomingRssi)
+      if (salt !== null && salt >= 0) {
+        lastRealSalinityRef.current = Date.now()
+        setSalinity({ value: Math.round(salt * 10) / 10, simulated: false })
+      }
       if (!isNaN(d) && d >= 0) {
         // เก็บทศนิยม 1 ตำแหน่ง — เกณฑ์สีละเอียดระดับ 0.5 ซม. ปัดเป็นจำนวนเต็มไม่ได้
         const rounded = Math.round(d * 10) / 10
@@ -505,6 +525,9 @@ function App() {
   // ===== สิ่งที่ควรทำตอนนี้ (รวมระดับน้ำ + พยากรณ์อากาศ) =====
   const weatherLevel = weather.todayAdvice?.level
   const rainComing = weatherLevel === 'danger' || weatherLevel === 'warning' || weather.nextRain !== null
+  const salinityStage = getSalinityStage(salinity.value)
+  const salinityPrediction = predictSalinity(salinity.value, weather.days)
+  const todayStr = weather.days[0]?.date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
   const action = (() => {
     if (connected && status === 'danger') {
       return {
@@ -721,6 +744,10 @@ function App() {
                 lastUpdated={lastUpdated}
                 weather={weather}
                 rainComing={rainComing}
+                salinity={salinity}
+                salinityStage={salinityStage}
+                salinityPrediction={salinityPrediction}
+                todayStr={todayStr}
                 onShowDetail={() => changeViewMode('detail')}
               />
             )}
@@ -830,6 +857,10 @@ function App() {
               <div className="lg:col-span-2">
                 <WeatherPanel weather={weather} />
               </div>
+            </div>
+
+            <div className="mb-6 sm:mb-8">
+              <SalinityCard salinity={salinity} stageKey={salinityStage} prediction={salinityPrediction} todayStr={todayStr} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
