@@ -189,7 +189,7 @@ export default function NowPage({
         <div className="today__head">
           <TodayIcon className="w-10 h-10" aria-hidden="true" />
           <div>
-            <p className="today__label">อากาศวันนี้{today ? ` · ฝน ${today.rainProb}%` : ''}</p>
+            <p className="today__label">อากาศวันนี้ที่ {weather.place.name}{today ? ` · ฝน ${today.rainProb}%` : ''}</p>
             <h2 className="today__title">{advice ? advice.title : weather.loading ? 'กำลังโหลด…' : 'ยังไม่มีข้อมูลอากาศ'}</h2>
           </div>
         </div>

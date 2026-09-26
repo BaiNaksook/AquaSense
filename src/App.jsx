@@ -13,6 +13,7 @@ import { BarChart3 } from 'lucide-react'
 import { getSalinityStage, predictSalinity, simulateSalinity } from './salinity'
 import { useWeather } from './weather'
 import { RED_MAX, getWaterStatus, marginToDanger } from './water'
+import { DEFAULT_PLACE, isValidPlace } from './places'
 
 // ===== MQTT Config =====
 // ตั้งค่าผ่าน .env (VITE_MQTT_*) — ค่า fallback คือบัญชีเดิม ควรเปลี่ยนเป็นบัญชีที่ subscribe ได้อย่างเดียว
@@ -157,7 +158,16 @@ function InstallCard({ installPrompt, onInstalled }) {
 // ===== Main App =====
 function App() {
   const page = useHashRoute()
-  const weather = useWeather()
+  // พื้นที่พยากรณ์อากาศ — เลือกได้ในหน้าตั้งค่า (จำไว้ในเครื่อง)
+  const [place, setPlace] = useState(() => {
+    const saved = storageJSON('weatherPlace', null)
+    return isValidPlace(saved) ? saved : DEFAULT_PLACE
+  })
+  const changePlace = (p) => {
+    setPlace(p)
+    storageSet('weatherPlace', JSON.stringify(p))
+  }
+  const weather = useWeather(place)
   const playSound = useAlertSound()
 
   // ---- ตั้งค่า (จำไว้ในเครื่อง) ----
@@ -401,7 +411,7 @@ function App() {
       />
     )
   } else if (page === 'settings') {
-    content = <SettingsPage theme={theme} onTheme={setTheme} soundOn={soundOn} onSound={setSoundOn} stationName={STATION_NAME} version={VERSION} />
+    content = <SettingsPage theme={theme} onTheme={setTheme} soundOn={soundOn} onSound={setSoundOn} place={place} onPlace={changePlace} stationName={STATION_NAME} version={VERSION} />
   } else {
     content = (
       <NowPage
@@ -462,7 +472,10 @@ function App() {
             </div>
           )}
           {TITLES[page] && (
-            <div className="page-head"><h1>{TITLES[page]}</h1></div>
+            <div className="page-head">
+              <h1>{TITLES[page]}</h1>
+              {page === 'week' && <a className="page-head__sub" href="#/settings">ที่ {place.name} · เปลี่ยน</a>}
+            </div>
           )}
           {content}
         </main>

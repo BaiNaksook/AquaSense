@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
+import { placeKey } from './places'
 import { AlertTriangle, ShieldCheck, OctagonAlert, Info, Cloud } from 'lucide-react'
 
 // ===== Weather Config =====
-// พิกัดแปลงนาเกลือ — ค่าเริ่มต้น: นาเกลือ ต.นาโคก อ.เมืองสมุทรสาคร (ตั้งผ่าน VITE_STATION_LAT / VITE_STATION_LON)
+// พิกัดที่ใช้พยากรณ์มาจาก place (เลือกได้ในหน้าตั้งค่า — ดู src/places.js)
 const env = import.meta.env ?? {}
-export const STATION_LAT = Number(env.VITE_STATION_LAT) || 13.47
-export const STATION_LON = Number(env.VITE_STATION_LON) || 100.2
 // token กรมอุตุนิยมวิทยา (data.tmd.go.th NWP API) — ไม่ใส่ก็ได้ ระบบจะใช้ Open-Meteo อย่างเดียว
 const TMD_TOKEN = env.VITE_TMD_TOKEN || ''
 
@@ -66,10 +65,10 @@ const TMD_COND = {
 }
 
 // ===== Fetchers =====
-async function fetchOpenMeteo() {
+async function fetchOpenMeteo(place) {
   const params = new URLSearchParams({
-    latitude: String(STATION_LAT),
-    longitude: String(STATION_LON),
+    latitude: String(place.lat),
+    longitude: String(place.lon),
     daily: [
       'weather_code', 'precipitation_probability_max', 'precipitation_sum',
       'temperature_2m_max', 'temperature_2m_min', 'wind_speed_10m_max',
@@ -121,11 +120,11 @@ export function parseOpenMeteo(json) {
   return { days, hours }
 }
 
-async function fetchTmd() {
+async function fetchTmd(place) {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
   const params = new URLSearchParams({
-    lat: String(STATION_LAT),
-    lon: String(STATION_LON),
+    lat: String(place.lat),
+    lon: String(place.lon),
     fields: 'tc_max,tc_min,rh,rain,ws10m,cond',
     date: today,
     duration: '7',
@@ -249,9 +248,11 @@ function writeCache(value) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(value)) } catch { /* ignore */ }
 }
 
-export function useWeather() {
+export function useWeather(place) {
+  const key = placeKey(place)
   const [state, setState] = useState(() => {
-    const cached = readCache()
+    // ข้อมูลที่เก็บไว้ใช้ได้เฉพาะเมื่อเป็นพื้นที่เดียวกัน
+    const cached = readCache()?.key === key ? readCache() : null
     return {
       days: cached?.days ?? [],
       hours: cached?.hours ?? [],
@@ -265,25 +266,33 @@ export function useWeather() {
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }))
     try {
-      const { days, hours } = await fetchOpenMeteo()
+      const { days, hours } = await fetchOpenMeteo(place)
       let merged = days
       let source = 'Open-Meteo'
       if (TMD_TOKEN) {
         try {
-          merged = mergeTmd(days, await fetchTmd())
+          merged = mergeTmd(days, await fetchTmd(place))
           source = 'กรมอุตุนิยมวิทยา + Open-Meteo'
         } catch (err) {
           console.warn('TMD forecast unavailable:', err.message)
         }
       }
-      const value = { days: merged, hours, fetchedAt: Date.now(), source }
+      const value = { key, days: merged, hours, fetchedAt: Date.now(), source }
       writeCache(value)
       setState({ ...value, loading: false, error: null })
     } catch (err) {
       // ออฟไลน์ / API ล่ม → ใช้ข้อมูลล่าสุดที่เคยโหลด พร้อมบอกผู้ใช้ว่าเป็นข้อมูลเก่า
       setState((s) => ({ ...s, loading: false, error: err.message || 'โหลดพยากรณ์อากาศไม่สำเร็จ' }))
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- โหลดใหม่เมื่อพิกัดเปลี่ยน (key) ไม่ใช่ทุกครั้งที่ object ใหม่
+  }, [key])
+
+  // เปลี่ยนพื้นที่ → ล้างพยากรณ์ของที่เดิมทันที ไม่ให้แสดงอากาศผิดที่
+  const [shownKey, setShownKey] = useState(key)
+  if (shownKey !== key) {
+    setShownKey(key)
+    setState({ days: [], hours: [], fetchedAt: null, source: null, loading: true, error: null })
+  }
 
   useEffect(() => {
     load()
@@ -306,5 +315,6 @@ export function useWeather() {
     nextRain: findNextRain(state.hours),
     seasonNote: getSeasonNote(),
     reload: load,
+    place,
   }
 }
